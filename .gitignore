@@ -1,0 +1,4 @@
+node_modules/
+tools/schema-generator/dist/
+frontend/node_modules/
+

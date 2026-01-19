@@ -6,6 +6,16 @@ import type { NetworkConfig, NetDevConfig } from '../api/client';
 import { Save, ArrowLeft, Trash2, Plus, Monitor, Layers, ArrowRight, Check, ChevronDown, ChevronRight, Sliders } from 'lucide-react';
 import { NETWORK_SECTIONS, NETDEV_SECTIONS, NETDEV_KINDS, COMMON_NETDEV_KINDS, type ConfigOption } from './schema';
 
+interface SectionDef {
+    name: string;
+    label: string;
+    options: ConfigOption[];
+    advanced?: boolean;
+}
+
+const typedNetworkSections = NETWORK_SECTIONS as unknown as Record<string, SectionDef>;
+const typedNetdevSections = NETDEV_SECTIONS as unknown as Record<string, SectionDef>;
+
 type Mode = 'physical' | 'virtual';
 type WizardStep = 'kind-selection' | 'essential-config' | 'full-editor';
 
@@ -80,7 +90,7 @@ const EditNetwork: React.FC = () => {
             const newFieldToggles: Record<string, boolean> = {};
 
             // Helper to check sections
-            const checkSections = (schema: typeof NETWORK_SECTIONS, data: any) => {
+            const checkSections = (schema: Record<string, SectionDef>, data: any) => {
                 Object.keys(schema).forEach(key => {
                     const def = schema[key];
                     const sectionData = data[def.name];
@@ -110,9 +120,9 @@ const EditNetwork: React.FC = () => {
                 });
             };
 
-            checkSections(NETWORK_SECTIONS, existingConfig);
+            checkSections(typedNetworkSections, existingConfig);
             if (existingConfig.netdev) {
-                checkSections(NETDEV_SECTIONS, existingConfig);
+                checkSections(typedNetdevSections, existingConfig);
             }
 
             setShowAdvancedSections(shouldShowAdvancedSections);
@@ -382,16 +392,16 @@ const EditNetwork: React.FC = () => {
 
     // Calculate Available Tabs (Basic vs Advanced)
     const availableTabs = mode === 'physical'
-        ? Object.keys(NETWORK_SECTIONS)
-        : [...(NETDEV_KINDS[netdevKind] || ['NetDev']), ...Object.keys(NETWORK_SECTIONS)];
+        ? Object.keys(typedNetworkSections)
+        : [...(NETDEV_KINDS[netdevKind] || ['NetDev']), ...Object.keys(typedNetworkSections)];
 
     const basicTabs = availableTabs.filter(t => {
-        const schema = NETDEV_SECTIONS[t] || NETWORK_SECTIONS[t];
+        const schema = typedNetdevSections[t] || typedNetworkSections[t];
         return !schema?.advanced;
     });
 
     const advancedTabs = availableTabs.filter(t => {
-        const schema = NETDEV_SECTIONS[t] || NETWORK_SECTIONS[t];
+        const schema = typedNetdevSections[t] || typedNetworkSections[t];
         return schema?.advanced;
     });
 
@@ -451,7 +461,7 @@ const EditNetwork: React.FC = () => {
     // Helper to generate INI preview
     const generatePreview = (isNetDevFile: boolean) => {
         const sectionsData = isNetDevFile ? netdevConfig : config;
-        const schema = isNetDevFile ? NETDEV_SECTIONS : NETWORK_SECTIONS;
+        const schema = isNetDevFile ? typedNetdevSections : typedNetworkSections;
         let ini = '';
         Object.keys(schema).forEach(sectionKey => {
             const sectionDef = schema[sectionKey];
@@ -546,8 +556,8 @@ const EditNetwork: React.FC = () => {
                         </p>
 
                         {/* Render Specific Fields (Only non-advanced ones typically in Wizard) */}
-                        {specificSectionKey && NETDEV_SECTIONS[specificSectionKey] &&
-                            NETDEV_SECTIONS[specificSectionKey].options.filter(o => !o.advanced).map(opt => renderField(opt, NETDEV_SECTIONS[specificSectionKey].name, true))
+                        {specificSectionKey && typedNetdevSections[specificSectionKey] &&
+                            typedNetdevSections[specificSectionKey].options.filter(o => !o.advanced).map(opt => renderField(opt, typedNetdevSections[specificSectionKey].name, true))
                         }
 
                         {/* Manual Name Override */}
@@ -604,7 +614,7 @@ const EditNetwork: React.FC = () => {
     }
 
     // DEFAULT: Full Editor (Standard Tabbed Interface)
-    const currentSectionSchema = NETDEV_SECTIONS[activeTab] || NETWORK_SECTIONS[activeTab];
+    const currentSectionSchema = typedNetdevSections[activeTab] || typedNetworkSections[activeTab];
     const hasAdvancedFields = currentSectionSchema?.options.some(o => o.advanced);
     const isSectionAdvancedToggleOn = advancedFieldToggles[currentSectionSchema?.name || ''];
 
@@ -662,7 +672,7 @@ const EditNetwork: React.FC = () => {
                                 borderRight: 'none', borderTop: 'none', borderBottom: 'none'
                             }}
                         >
-                            {NETDEV_SECTIONS[tab]?.label || NETWORK_SECTIONS[tab]?.label || tab}
+                            {typedNetdevSections[tab]?.label || typedNetworkSections[tab]?.label || tab}
                         </button>
                     ))}
 
@@ -690,7 +700,7 @@ const EditNetwork: React.FC = () => {
                                         borderRight: 'none', borderTop: 'none', borderBottom: 'none'
                                     }}
                                 >
-                                    {NETDEV_SECTIONS[tab]?.label || NETWORK_SECTIONS[tab]?.label || tab}
+                                    {typedNetdevSections[tab]?.label || typedNetworkSections[tab]?.label || tab}
                                 </button>
                             ))}
                         </>
@@ -716,7 +726,7 @@ const EditNetwork: React.FC = () => {
 
                     {/* Render Fields */}
                     {currentSectionSchema && currentSectionSchema.options.map(opt =>
-                        renderField(opt, currentSectionSchema.name, !!NETDEV_SECTIONS[activeTab])
+                        renderField(opt, currentSectionSchema.name, !!typedNetdevSections[activeTab])
                     )}
 
                     {/* Advanced Toggle inside Section */}

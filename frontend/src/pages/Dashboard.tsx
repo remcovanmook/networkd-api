@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
-import type { InterfaceFile } from '../api/client';
+import type { InterfaceFile, Link as LinkInterface } from '../api/client';
 import { FileText, Activity, ArrowRight, Network as NetworkIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -25,7 +25,7 @@ const Dashboard: React.FC = () => {
     });
 
     const summaryGroups = useMemo(() => {
-        const groups: Record<string, { netdev?: InterfaceFile, network?: InterfaceFile }> = {};
+        const groups: Record<string, { netdev?: InterfaceFile, network?: InterfaceFile, link?: LinkInterface }> = {};
 
         // Index NetDevs
         netdevs?.forEach(f => {
@@ -44,8 +44,14 @@ const Dashboard: React.FC = () => {
             groups[name].network = f;
         });
 
+        // Index Runtime Links
+        links?.forEach(l => {
+            if (!groups[l.name]) groups[l.name] = {};
+            groups[l.name].link = l;
+        });
+
         return groups;
-    }, [netdevs, configs]);
+    }, [netdevs, configs, links]);
 
     return (
         <div>
@@ -200,16 +206,28 @@ const Dashboard: React.FC = () => {
                 <div style={{ display: 'grid', gap: '1rem', color: 'var(--text-secondary)' }}>
                     {Object.entries(summaryGroups).map(([name, group]) => {
                         const sentences: string[] = [];
-                        const { netdev, network } = group;
-                        if (netdev) {
-                            sentences.push(`${name} is a ${netdev.netdev_kind || 'virtual'} device.`);
-                            if (netdev.summary?.vlan_id) sentences.push(`It is assigned VLAN ID ${netdev.summary.vlan_id}.`);
+                        const { netdev, network, link } = group;
+
+                        if (link) {
+                            if (netdev) {
+                                sentences.push(`${name} is a active ${netdev.netdev_kind || 'virtual'} device.`);
+                            } else {
+                                sentences.push(`${name} is a system interface.`);
+                            }
+                            if (link.operational_state) sentences.push(`Status: ${link.operational_state}.`);
+                        } else if (netdev) {
+                            sentences.push(`${name} is a ${netdev.netdev_kind || 'virtual'} device definition (inactive).`);
                         }
+
+                        if (netdev && netdev.summary?.vlan_id) sentences.push(`VLAN ID: ${netdev.summary.vlan_id}.`);
+
                         if (network && network.summary) {
                             const s = network.summary;
-                            if (s.dhcp === 'yes') sentences.push(netdev ? `It is configured using DHCP.` : `${name} has been configured using DHCP.`);
+                            if (s.dhcp === 'yes') sentences.push(`Configured via DHCP.`);
                             if (s.address?.length) sentences.push(`Static IP(s): ${s.address.join(', ')}.`);
                             if (s.vlan?.length) sentences.push(`Attached VLANs: ${s.vlan.join(', ')}.`);
+                        } else if (link && !network) {
+                            sentences.push(`Unmanaged or manual configuration.`);
                         }
                         if (sentences.length === 0) return null;
                         return (
