@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_Base = 'http://localhost:8080/api';
+const API_Base = '/api';
 
 export interface Link {
     index: number;

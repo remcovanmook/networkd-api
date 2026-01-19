@@ -119,6 +119,66 @@ The backend exposes a RESTful API organized into:
 -   `/api/networks`: Managing `.network` configuration profiles.
 -   `/api/system`: System operational commands (reload, logs, routes).
 
+## Production Deployment
+
+To run the application in a production environment (Standalone Mode):
+
+### 1. Build the Frontend
+```bash
+cd frontend
+npm install
+npm run build
+```
+This creates the production assets in `frontend/dist`.
+
+### 2. Install the Backend
+Build the backend binary:
+```bash
+cd ..
+go build -o networkd-api-server cmd/server/main.go
+sudo mkdir -p /opt/networkd-api
+sudo mv networkd-api-server /opt/networkd-api/
+```
+
+### 3. Configure Systemd Service
+The backend runs as a systemd service. We configure it to listen on all interfaces (or a specific public IP) and serve the frontend assets directly.
+
+1.  Copy the service file:
+    ```bash
+    sudo cp systemd/networkd-api.service /etc/systemd/system/
+    ```
+2.  Edit configuration:
+    ```bash
+    sudo nano /etc/systemd/system/networkd-api.service
+    ```
+    Ensure the following environment variables are set:
+    *   `NETWORKD_HOST`: Set to `0.0.0.0` to listen on all interfaces (or your public IP).
+    *   `NETWORKD_PORT`: Port to listen on (e.g., `80`). Note: Ports < 1024 require root or `CAP_NET_BIND_SERVICE`.
+    *   `STATIC_DIR`: Path to the frontend `dist` folder (e.g., `/opt/networkd-api/dist`).
+
+    **Example Service Configuration:**
+    ```ini
+    [Service]
+    ...
+    Environment=NETWORKD_HOST=0.0.0.0
+    Environment=NETWORKD_PORT=80
+    Environment=STATIC_DIR=/opt/networkd-api/dist
+    ...
+    ```
+
+3.  Copy Frontend Assets:
+    ```bash
+    sudo cp -r frontend/dist /opt/networkd-api/
+    ```
+
+4.  Reload and start the service:
+    ```bash
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now networkd-api
+    ```
+
+Now, navigate to your server's IP address. The Go server handles both the API and the React frontend.
+
 ## License
 
 This project is licensed under the **GNU General Public License v2.0**.

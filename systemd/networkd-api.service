@@ -1,0 +1,22 @@
+[Unit]
+Description=networkd-api - Web interface for systemd-networkd
+After=network.target dbus.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/networkd-api
+ExecStart=/opt/networkd-api/networkd-api-server
+Restart=always
+RestartSec=5
+
+# Binding to all interfaces for standalone mode
+Environment=NETWORKD_HOST=0.0.0.0
+Environment=NETWORKD_PORT=8080
+Environment=STATIC_DIR=/opt/networkd-api/dist
+# Default systemd-networkd paths
+Environment=NETWORKD_CONFIG_DIR=/etc/systemd/network
+Environment=NETWORKD_GLOBAL_CONFIG=/etc/systemd/networkd.conf
+
+[Install]
+WantedBy=multi-user.target

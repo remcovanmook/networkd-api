@@ -2,13 +2,14 @@ package api
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 )
 
-func NewRouter(h *Handler) http.Handler {
+func NewRouter(h *Handler, staticDir string) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
@@ -45,6 +46,29 @@ func NewRouter(h *Handler) http.Handler {
 		r.Get("/system/routes", h.GetRoutes)
 		r.Get("/system/logs", h.GetLogs)
 	})
+
+	// Serve Static Files (SPA) if staticDir is configured
+	if staticDir != "" {
+		fs := http.FileServer(http.Dir(staticDir))
+		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+			// Check if file exists, otherwise serve index.html
+			// This is a naive SPA implementation but sufficient for this scale
+			path := r.URL.Path
+			// Prevent directory traversal is handled by http.ServeFile/FileServer generally,
+			// but we need to check existence to fallback to index.html
+			fullPath := staticDir + path
+
+			// If it's a file that exists, serve it
+			if info, err := // Wait, I need os package
+				os.Stat(fullPath); err == nil && !info.IsDir() {
+				fs.ServeHTTP(w, r)
+				return
+			}
+
+			// Serve index.html for all other routes (client-side routing)
+			http.ServeFile(w, r, staticDir+"/index.html")
+		})
+	}
 
 	return r
 }
