@@ -2,18 +2,22 @@
 // GENERATED FILE - DO NOT EDIT
 // systemd network + netdev
 
+// Derived from schema-config.json
+export const CATEGORY_ORDER = ["Basic","Addressing & Routing","DHCP","IPv6","Tunneling & VPN","Bridging","QoS","SR-IOV","Advanced"];
+
 export const NETWORK_SECTIONS = {
 
   'Match': {
     name: 'Match',
     label: 'Match',
+    category: 'Basic',
     options: [
       {
       key: 'MACAddress',
       name: 'MACAddress',
       label: 'MACAddress',
       type: 'list',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'PermanentMACAddress',
@@ -34,14 +38,14 @@ export const NETWORK_SECTIONS = {
       name: 'Driver',
       label: 'Driver',
       type: 'list',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Type',
       name: 'Type',
       label: 'Type',
       type: 'list',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Kind',
@@ -62,7 +66,7 @@ export const NETWORK_SECTIONS = {
       name: 'Name',
       label: 'Name',
       type: 'list',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'WLANInterfaceType',
@@ -90,21 +94,21 @@ export const NETWORK_SECTIONS = {
       name: 'Host',
       label: 'Host',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Virtualization',
       name: 'Virtualization',
       label: 'Virtualization',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'KernelCommandLine',
       name: 'KernelCommandLine',
       label: 'KernelCommandLine',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'KernelVersion',
@@ -125,7 +129,7 @@ export const NETWORK_SECTIONS = {
       name: 'Architecture',
       label: 'Architecture',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Firmware',
@@ -139,20 +143,21 @@ export const NETWORK_SECTIONS = {
   'Link': {
     name: 'Link',
     label: 'Link',
+    category: 'Basic',
     options: [
       {
       key: 'MACAddress',
       name: 'MACAddress',
       label: 'MACAddress',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'MTUBytes',
       name: 'MTUBytes',
       label: 'MTUBytes',
       type: 'number',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'ARP',
@@ -187,7 +192,7 @@ export const NETWORK_SECTIONS = {
       name: 'Unmanaged',
       label: 'Unmanaged',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Group',
@@ -201,7 +206,7 @@ export const NETWORK_SECTIONS = {
       name: 'RequiredForOnline',
       label: 'RequiredForOnline',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
         key: 'RequiredFamilyForOnline',
@@ -217,13 +222,14 @@ export const NETWORK_SECTIONS = {
         label: 'ActivationPolicy',
         type: 'select',
         options: ["up","always-up","manual","always-down","down","or bound"],
-        advanced: true,
+        advanced: false,
       }
     ],
   },
   'SR-IOV': {
     name: 'SR-IOV',
     label: 'SR-IOV',
+    category: 'SR-IOV',
     options: [
       {
       key: 'VirtualFunction',
@@ -293,6 +299,7 @@ export const NETWORK_SECTIONS = {
   'Network': {
     name: 'Network',
     label: 'Network',
+    category: 'Basic',
     options: [
       {
       key: 'Description',
@@ -306,7 +313,7 @@ export const NETWORK_SECTIONS = {
       name: 'DHCP',
       label: 'DHCP',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'DHCPServer',
@@ -320,7 +327,7 @@ export const NETWORK_SECTIONS = {
       name: 'LinkLocalAddressing',
       label: 'LinkLocalAddressing',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
         key: 'IPv6LinkLocalAddressGenerationMode',
@@ -433,7 +440,7 @@ export const NETWORK_SECTIONS = {
       name: 'DNS',
       label: 'DNS',
       type: 'list',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'UseDomains',
@@ -448,7 +455,7 @@ export const NETWORK_SECTIONS = {
         label: 'Domains',
         type: 'select',
         options: ["them may be successfully resolved"],
-        advanced: true,
+        advanced: false,
       },
 {
       key: 'DNSDefaultRoute',
@@ -483,7 +490,7 @@ export const NETWORK_SECTIONS = {
       name: 'IPMasquerade',
       label: 'IPMasquerade',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'IPv6PrivacyExtensions',
@@ -497,7 +504,7 @@ export const NETWORK_SECTIONS = {
       name: 'IPv6AcceptRA',
       label: 'IPv6AcceptRA',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'IPv6DuplicateAddressDetection',
@@ -660,20 +667,21 @@ export const NETWORK_SECTIONS = {
   'Address': {
     name: 'Address',
     label: 'Address',
+    category: 'Addressing & Routing',
     options: [
       {
       key: 'Address',
       name: 'Address',
       label: 'Address',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Peer',
       name: 'Peer',
       label: 'Peer',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Broadcast',
@@ -687,7 +695,7 @@ export const NETWORK_SECTIONS = {
       name: 'Label',
       label: 'Label',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'PreferredLifetime',
@@ -701,7 +709,7 @@ export const NETWORK_SECTIONS = {
       name: 'Scope',
       label: 'Scope',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'RouteMetric',
@@ -766,6 +774,7 @@ export const NETWORK_SECTIONS = {
   'Neighbor': {
     name: 'Neighbor',
     label: 'Neighbor',
+    category: 'Addressing & Routing',
     options: [
       {
       key: 'Address',
@@ -786,6 +795,7 @@ export const NETWORK_SECTIONS = {
   'IPv6AddressLabel': {
     name: 'IPv6AddressLabel',
     label: 'IPv6AddressLabel',
+    category: 'Addressing & Routing',
     options: [
       {
       key: 'Label',
@@ -806,6 +816,7 @@ export const NETWORK_SECTIONS = {
   'RoutingPolicyRule': {
     name: 'RoutingPolicyRule',
     label: 'RoutingPolicyRule',
+    category: 'Addressing & Routing',
     options: [
       {
       key: 'TypeOfService',
@@ -947,6 +958,7 @@ export const NETWORK_SECTIONS = {
   'NextHop': {
     name: 'NextHop',
     label: 'NextHop',
+    category: 'Addressing & Routing',
     options: [
       {
       key: 'Id',
@@ -996,13 +1008,14 @@ export const NETWORK_SECTIONS = {
   'Route': {
     name: 'Route',
     label: 'Route',
+    category: 'Addressing & Routing',
     options: [
       {
       key: 'Gateway',
       name: 'Gateway',
       label: 'Gateway',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'GatewayOnLink',
@@ -1016,7 +1029,7 @@ export const NETWORK_SECTIONS = {
       name: 'Destination',
       label: 'Destination',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Source',
@@ -1030,7 +1043,7 @@ export const NETWORK_SECTIONS = {
       name: 'Metric',
       label: 'Metric',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
         key: 'IPv6Preference',
@@ -1052,7 +1065,7 @@ export const NETWORK_SECTIONS = {
       name: 'PreferredSource',
       label: 'PreferredSource',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
         key: 'Table',
@@ -1060,7 +1073,7 @@ export const NETWORK_SECTIONS = {
         label: 'Table',
         type: 'select',
         options: ["predefined names default","main","and local","and names defined in RouteTable= in networkd"],
-        advanced: true,
+        advanced: false,
       },
 {
       key: 'HopLimit',
@@ -1159,6 +1172,7 @@ export const NETWORK_SECTIONS = {
   'DHCPv4': {
     name: 'DHCPv4',
     label: 'DHCPv4',
+    category: 'DHCP',
     options: [
       {
       key: 'RequestAddress',
@@ -1194,7 +1208,7 @@ export const NETWORK_SECTIONS = {
         label: 'ClientIdentifier',
         type: 'select',
         options: ["mac or duid"],
-        advanced: true,
+        advanced: false,
       },
 {
       key: 'VendorClassIdentifier',
@@ -1295,7 +1309,7 @@ export const NETWORK_SECTIONS = {
       name: 'UseDNS',
       label: 'UseDNS',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'RoutesToDNS',
@@ -1309,7 +1323,7 @@ export const NETWORK_SECTIONS = {
       name: 'UseNTP',
       label: 'UseNTP',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'RoutesToNTP',
@@ -1358,14 +1372,14 @@ export const NETWORK_SECTIONS = {
       name: 'UseDomains',
       label: 'UseDomains',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'UseRoutes',
       name: 'UseRoutes',
       label: 'UseRoutes',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'RouteMetric',
@@ -1530,6 +1544,7 @@ export const NETWORK_SECTIONS = {
   'DHCPv6': {
     name: 'DHCPv6',
     label: 'DHCPv6',
+    category: 'DHCP',
     options: [
       {
       key: 'MUDURL',
@@ -1651,6 +1666,7 @@ export const NETWORK_SECTIONS = {
   'DHCPPrefixDelegation': {
     name: 'DHCPPrefixDelegation',
     label: 'DHCPPrefixDelegation',
+    category: 'Advanced',
     options: [
       {
         key: 'UplinkInterface',
@@ -1721,6 +1737,7 @@ export const NETWORK_SECTIONS = {
   'IPv6AcceptRA': {
     name: 'IPv6AcceptRA',
     label: 'IPv6AcceptRA',
+    category: 'IPv6',
     options: [
       {
       key: 'UseRedirect',
@@ -1917,6 +1934,7 @@ export const NETWORK_SECTIONS = {
   'DHCPServer': {
     name: 'DHCPServer',
     label: 'DHCPServer',
+    category: 'DHCP',
     options: [
       {
         key: 'ServerAddress',
@@ -1931,7 +1949,7 @@ export const NETWORK_SECTIONS = {
       name: 'PoolOffset',
       label: 'PoolOffset',
       type: 'number',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'DefaultLeaseTimeSec',
@@ -1953,21 +1971,21 @@ export const NETWORK_SECTIONS = {
       name: 'EmitDNS',
       label: 'EmitDNS',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'EmitNTP',
       name: 'EmitNTP',
       label: 'EmitNTP',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'EmitRouter',
       name: 'EmitRouter',
       label: 'EmitRouter',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'EmitTimezone',
@@ -2068,6 +2086,7 @@ export const NETWORK_SECTIONS = {
   'DHCPServerStaticLease': {
     name: 'DHCPServerStaticLease',
     label: 'DHCPServerStaticLease',
+    category: 'Advanced',
     options: [
       {
       key: 'MACAddress',
@@ -2088,13 +2107,14 @@ export const NETWORK_SECTIONS = {
   'IPv6SendRA': {
     name: 'IPv6SendRA',
     label: 'IPv6SendRA',
+    category: 'IPv6',
     options: [
       {
       key: 'Managed',
       name: 'Managed',
       label: 'Managed',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'RouterLifetimeSec',
@@ -2122,7 +2142,7 @@ export const NETWORK_SECTIONS = {
       name: 'RouterPreference',
       label: 'RouterPreference',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'HopLimit',
@@ -2144,14 +2164,14 @@ export const NETWORK_SECTIONS = {
       name: 'EmitDNS',
       label: 'EmitDNS',
       type: 'list',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'EmitDomains',
       name: 'EmitDomains',
       label: 'EmitDomains',
       type: 'list',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'DNSLifetimeSec',
@@ -2186,6 +2206,7 @@ export const NETWORK_SECTIONS = {
   'IPv6Prefix': {
     name: 'IPv6Prefix',
     label: 'IPv6Prefix',
+    category: 'IPv6',
     options: [
       {
       key: 'AddressAutoconfiguration',
@@ -2199,14 +2220,14 @@ export const NETWORK_SECTIONS = {
       name: 'Prefix',
       label: 'Prefix',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'PreferredLifetimeSec',
       name: 'PreferredLifetimeSec',
       label: 'PreferredLifetimeSec',
       type: 'number',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Assign',
@@ -2234,6 +2255,7 @@ export const NETWORK_SECTIONS = {
   'IPv6RoutePrefix': {
     name: 'IPv6RoutePrefix',
     label: 'IPv6RoutePrefix',
+    category: 'IPv6',
     options: [
       {
       key: 'Route',
@@ -2254,6 +2276,7 @@ export const NETWORK_SECTIONS = {
   'IPv6PREF64Prefix': {
     name: 'IPv6PREF64Prefix',
     label: 'IPv6PREF64Prefix',
+    category: 'Advanced',
     options: [
       {
       key: 'Prefix',
@@ -2274,6 +2297,7 @@ export const NETWORK_SECTIONS = {
   'Bridge': {
     name: 'Bridge',
     label: 'Bridge',
+    category: 'Bridging',
     options: [
       {
       key: 'UnicastFlood',
@@ -2386,6 +2410,7 @@ export const NETWORK_SECTIONS = {
   'BridgeFDB': {
     name: 'BridgeFDB',
     label: 'BridgeFDB',
+    category: 'Bridging',
     options: [
       {
       key: 'MACAddress',
@@ -2435,6 +2460,7 @@ export const NETWORK_SECTIONS = {
   'BridgeMDB': {
     name: 'BridgeMDB',
     label: 'BridgeMDB',
+    category: 'Bridging',
     options: [
       {
       key: 'MulticastGroupAddress',
@@ -2455,6 +2481,7 @@ export const NETWORK_SECTIONS = {
   'LLDP': {
     name: 'LLDP',
     label: 'LLDP',
+    category: 'Advanced',
     options: [
       {
       key: 'MUDURL',
@@ -2468,6 +2495,7 @@ export const NETWORK_SECTIONS = {
   'CAN': {
     name: 'CAN',
     label: 'CAN',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'BitRate',
@@ -2586,6 +2614,7 @@ export const NETWORK_SECTIONS = {
   'IPoIB': {
     name: 'IPoIB',
     label: 'IPoIB',
+    category: 'Advanced',
     options: [
       {
         key: 'Mode',
@@ -2607,6 +2636,7 @@ export const NETWORK_SECTIONS = {
   'QDisc': {
     name: 'QDisc',
     label: 'QDisc',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -2628,6 +2658,7 @@ export const NETWORK_SECTIONS = {
   'NetworkEmulator': {
     name: 'NetworkEmulator',
     label: 'NetworkEmulator',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -2684,6 +2715,7 @@ export const NETWORK_SECTIONS = {
   'TokenBucketFilter': {
     name: 'TokenBucketFilter',
     label: 'TokenBucketFilter',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -2754,6 +2786,7 @@ export const NETWORK_SECTIONS = {
   'PIE': {
     name: 'PIE',
     label: 'PIE',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -2782,6 +2815,7 @@ export const NETWORK_SECTIONS = {
   'FlowQueuePIE': {
     name: 'FlowQueuePIE',
     label: 'FlowQueuePIE',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -2810,6 +2844,7 @@ export const NETWORK_SECTIONS = {
   'StochasticFairBlue': {
     name: 'StochasticFairBlue',
     label: 'StochasticFairBlue',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -2838,6 +2873,7 @@ export const NETWORK_SECTIONS = {
   'StochasticFairnessQueueing': {
     name: 'StochasticFairnessQueueing',
     label: 'StochasticFairnessQueueing',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -2866,6 +2902,7 @@ export const NETWORK_SECTIONS = {
   'BFIFO': {
     name: 'BFIFO',
     label: 'BFIFO',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -2894,6 +2931,7 @@ export const NETWORK_SECTIONS = {
   'PFIFO': {
     name: 'PFIFO',
     label: 'PFIFO',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -2922,6 +2960,7 @@ export const NETWORK_SECTIONS = {
   'PFIFOHeadDrop': {
     name: 'PFIFOHeadDrop',
     label: 'PFIFOHeadDrop',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -2950,6 +2989,7 @@ export const NETWORK_SECTIONS = {
   'PFIFOFast': {
     name: 'PFIFOFast',
     label: 'PFIFOFast',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -2971,6 +3011,7 @@ export const NETWORK_SECTIONS = {
   'CAKE': {
     name: 'CAKE',
     label: 'CAKE',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3091,6 +3132,7 @@ export const NETWORK_SECTIONS = {
   'ControlledDelay': {
     name: 'ControlledDelay',
     label: 'ControlledDelay',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3147,6 +3189,7 @@ export const NETWORK_SECTIONS = {
   'DeficitRoundRobinScheduler': {
     name: 'DeficitRoundRobinScheduler',
     label: 'DeficitRoundRobinScheduler',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -3168,6 +3211,7 @@ export const NETWORK_SECTIONS = {
   'DeficitRoundRobinSchedulerClass': {
     name: 'DeficitRoundRobinSchedulerClass',
     label: 'DeficitRoundRobinSchedulerClass',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -3196,6 +3240,7 @@ export const NETWORK_SECTIONS = {
   'EnhancedTransmissionSelection': {
     name: 'EnhancedTransmissionSelection',
     label: 'EnhancedTransmissionSelection',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -3246,6 +3291,7 @@ export const NETWORK_SECTIONS = {
   'GenericRandomEarlyDetection': {
     name: 'GenericRandomEarlyDetection',
     label: 'GenericRandomEarlyDetection',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3288,6 +3334,7 @@ export const NETWORK_SECTIONS = {
   'FairQueueingControlledDelay': {
     name: 'FairQueueingControlledDelay',
     label: 'FairQueueingControlledDelay',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3365,6 +3412,7 @@ export const NETWORK_SECTIONS = {
   'FairQueueing': {
     name: 'FairQueueing',
     label: 'FairQueueing',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3449,6 +3497,7 @@ export const NETWORK_SECTIONS = {
   'TrivialLinkEqualizer': {
     name: 'TrivialLinkEqualizer',
     label: 'TrivialLinkEqualizer',
+    category: 'Advanced',
     options: [
       {
         key: 'Parent',
@@ -3477,6 +3526,7 @@ export const NETWORK_SECTIONS = {
   'HierarchyTokenBucket': {
     name: 'HierarchyTokenBucket',
     label: 'HierarchyTokenBucket',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3512,6 +3562,7 @@ export const NETWORK_SECTIONS = {
   'HierarchyTokenBucketClass': {
     name: 'HierarchyTokenBucketClass',
     label: 'HierarchyTokenBucketClass',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3589,6 +3640,7 @@ export const NETWORK_SECTIONS = {
   'ClassfulMultiQueueing': {
     name: 'ClassfulMultiQueueing',
     label: 'ClassfulMultiQueueing',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3610,6 +3662,7 @@ export const NETWORK_SECTIONS = {
   'BandMultiQueueing': {
     name: 'BandMultiQueueing',
     label: 'BandMultiQueueing',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3631,6 +3684,7 @@ export const NETWORK_SECTIONS = {
   'HeavyHitterFilter': {
     name: 'HeavyHitterFilter',
     label: 'HeavyHitterFilter',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3659,6 +3713,7 @@ export const NETWORK_SECTIONS = {
   'QuickFairQueueing': {
     name: 'QuickFairQueueing',
     label: 'QuickFairQueueing',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3680,6 +3735,7 @@ export const NETWORK_SECTIONS = {
   'QuickFairQueueingClass': {
     name: 'QuickFairQueueingClass',
     label: 'QuickFairQueueingClass',
+    category: 'QoS',
     options: [
       {
         key: 'Parent',
@@ -3715,6 +3771,7 @@ export const NETWORK_SECTIONS = {
   'BridgeVLAN': {
     name: 'BridgeVLAN',
     label: 'BridgeVLAN',
+    category: 'Bridging',
     options: [
       {
       key: 'VLAN',
@@ -3746,27 +3803,28 @@ export const NETDEV_SECTIONS = {
   'Match': {
     name: 'Match',
     label: 'Match',
+    category: 'Basic',
     options: [
       {
       key: 'Host',
       name: 'Host',
       label: 'Host',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Virtualization',
       name: 'Virtualization',
       label: 'Virtualization',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'KernelCommandLine',
       name: 'KernelCommandLine',
       label: 'KernelCommandLine',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'KernelVersion',
@@ -3787,7 +3845,7 @@ export const NETDEV_SECTIONS = {
       name: 'Architecture',
       label: 'Architecture',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Firmware',
@@ -3801,47 +3859,49 @@ export const NETDEV_SECTIONS = {
   'NetDev': {
     name: 'NetDev',
     label: 'NetDev',
+    category: 'Basic',
     options: [
       {
       key: 'Description',
       name: 'Description',
       label: 'Description',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Name',
       name: 'Name',
       label: 'Name',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Kind',
       name: 'Kind',
       label: 'Kind',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'MTUBytes',
       name: 'MTUBytes',
       label: 'MTUBytes',
       type: 'number',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'MACAddress',
       name: 'MACAddress',
       label: 'MACAddress',
       type: 'string',
-      advanced: true,
+      advanced: false,
     }
     ],
   },
   'Bridge': {
     name: 'Bridge',
     label: 'Bridge',
+    category: 'Bridging',
     options: [
       {
       key: 'HelloTimeSec',
@@ -3911,7 +3971,7 @@ export const NETDEV_SECTIONS = {
       name: 'VLANFiltering',
       label: 'VLANFiltering',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'VLANProtocol',
@@ -3925,7 +3985,7 @@ export const NETDEV_SECTIONS = {
       name: 'STP',
       label: 'STP',
       type: 'boolean',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'MulticastIGMPVersion',
@@ -3946,20 +4006,21 @@ export const NETDEV_SECTIONS = {
   'VLAN': {
     name: 'VLAN',
     label: 'VLAN',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'Id',
       name: 'Id',
       label: 'Id',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Protocol',
       name: 'Protocol',
       label: 'Protocol',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'GVRP',
@@ -4001,6 +4062,7 @@ export const NETDEV_SECTIONS = {
   'MACVLAN': {
     name: 'MACVLAN',
     label: 'MACVLAN',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'Mode',
@@ -4035,6 +4097,7 @@ export const NETDEV_SECTIONS = {
   'IPVLAN': {
     name: 'IPVLAN',
     label: 'IPVLAN',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'Mode',
@@ -4055,6 +4118,7 @@ export const NETDEV_SECTIONS = {
   'VXLAN': {
     name: 'VXLAN',
     label: 'VXLAN',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'VNI',
@@ -4237,6 +4301,7 @@ export const NETDEV_SECTIONS = {
   'GENEVE': {
     name: 'GENEVE',
     label: 'GENEVE',
+    category: 'Advanced',
     options: [
       {
       key: 'Id',
@@ -4320,6 +4385,7 @@ export const NETDEV_SECTIONS = {
   'BareUDP': {
     name: 'BareUDP',
     label: 'BareUDP',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'DestinationPort',
@@ -4348,6 +4414,7 @@ export const NETDEV_SECTIONS = {
   'L2TP': {
     name: 'L2TP',
     label: 'L2TP',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'TunnelId',
@@ -4426,6 +4493,7 @@ export const NETDEV_SECTIONS = {
   'L2TPSession': {
     name: 'L2TPSession',
     label: 'L2TPSession',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'Name',
@@ -4461,6 +4529,7 @@ export const NETDEV_SECTIONS = {
   'MACsec': {
     name: 'MACsec',
     label: 'MACsec',
+    category: 'Advanced',
     options: [
       {
       key: 'Port',
@@ -4481,6 +4550,7 @@ export const NETDEV_SECTIONS = {
   'MACsecReceiveChannel': {
     name: 'MACsecReceiveChannel',
     label: 'MACsecReceiveChannel',
+    category: 'Advanced',
     options: [
       {
       key: 'Port',
@@ -4501,6 +4571,7 @@ export const NETDEV_SECTIONS = {
   'MACsecTransmitAssociation': {
     name: 'MACsecTransmitAssociation',
     label: 'MACsecTransmitAssociation',
+    category: 'Advanced',
     options: [
       {
       key: 'PacketNumber',
@@ -4549,6 +4620,7 @@ export const NETDEV_SECTIONS = {
   'MACsecReceiveAssociation': {
     name: 'MACsecReceiveAssociation',
     label: 'MACsecReceiveAssociation',
+    category: 'Advanced',
     options: [
       {
       key: 'Port',
@@ -4604,6 +4676,7 @@ export const NETDEV_SECTIONS = {
   'Tunnel': {
     name: 'Tunnel',
     label: 'Tunnel',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'External',
@@ -4808,6 +4881,7 @@ export const NETDEV_SECTIONS = {
   'FooOverUDP': {
     name: 'FooOverUDP',
     label: 'FooOverUDP',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'Encapsulation',
@@ -4856,6 +4930,7 @@ export const NETDEV_SECTIONS = {
   'Peer': {
     name: 'Peer',
     label: 'Peer',
+    category: 'Advanced',
     options: [
       {
       key: 'Name',
@@ -4876,6 +4951,7 @@ export const NETDEV_SECTIONS = {
   'VXCAN': {
     name: 'VXCAN',
     label: 'VXCAN',
+    category: 'Advanced',
     options: [
       {
       key: 'Peer',
@@ -4889,6 +4965,7 @@ export const NETDEV_SECTIONS = {
   'Tun': {
     name: 'Tun',
     label: 'Tun',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'MultiQueue',
@@ -4937,13 +5014,14 @@ export const NETDEV_SECTIONS = {
   'WireGuard': {
     name: 'WireGuard',
     label: 'WireGuard',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'PrivateKey',
       name: 'PrivateKey',
       label: 'PrivateKey',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'PrivateKeyFile',
@@ -4957,7 +5035,7 @@ export const NETDEV_SECTIONS = {
       name: 'ListenPort',
       label: 'ListenPort',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'FirewallMark',
@@ -4985,13 +5063,14 @@ export const NETDEV_SECTIONS = {
   'WireGuardPeer': {
     name: 'WireGuardPeer',
     label: 'WireGuardPeer',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'PublicKey',
       name: 'PublicKey',
       label: 'PublicKey',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'PublicKeyFile',
@@ -5005,7 +5084,7 @@ export const NETDEV_SECTIONS = {
       name: 'PresharedKey',
       label: 'PresharedKey',
       type: 'string',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'PresharedKeyFile',
@@ -5019,21 +5098,21 @@ export const NETDEV_SECTIONS = {
       name: 'AllowedIPs',
       label: 'AllowedIPs',
       type: 'list',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'Endpoint',
       name: 'Endpoint',
       label: 'Endpoint',
       type: 'number',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'PersistentKeepalive',
       name: 'PersistentKeepalive',
       label: 'PersistentKeepalive',
       type: 'number',
-      advanced: true,
+      advanced: false,
     },
 {
       key: 'RouteTable',
@@ -5054,6 +5133,7 @@ export const NETDEV_SECTIONS = {
   'Bond': {
     name: 'Bond',
     label: 'Bond',
+    category: 'Tunneling & VPN',
     options: [
       {
         key: 'Mode',
@@ -5236,6 +5316,7 @@ export const NETDEV_SECTIONS = {
   'Xfrm': {
     name: 'Xfrm',
     label: 'Xfrm',
+    category: 'Tunneling & VPN',
     options: [
       {
       key: 'InterfaceId',
@@ -5256,6 +5337,7 @@ export const NETDEV_SECTIONS = {
   'VRF': {
     name: 'VRF',
     label: 'VRF',
+    category: 'Advanced',
     options: [
       {
       key: 'Table',
@@ -5269,6 +5351,7 @@ export const NETDEV_SECTIONS = {
   'BatmanAdvanced': {
     name: 'BatmanAdvanced',
     label: 'BatmanAdvanced',
+    category: 'Advanced',
     options: [
       {
         key: 'GatewayMode',
@@ -5346,6 +5429,7 @@ export const NETDEV_SECTIONS = {
   'IPoIB': {
     name: 'IPoIB',
     label: 'IPoIB',
+    category: 'Advanced',
     options: [
       {
       key: 'PartitionKey',
@@ -5374,6 +5458,7 @@ export const NETDEV_SECTIONS = {
   'WLAN': {
     name: 'WLAN',
     label: 'WLAN',
+    category: 'Advanced',
     options: [
       {
       key: 'PhysicalDevice',

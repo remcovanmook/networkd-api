@@ -1,51 +1,34 @@
+"use strict";
 // tools/schema-generator/emit-ts.ts
-
-import { ManPageDef } from './types';
-
-export interface SectionConfig {
-  name: string;
-  visible?: string[];
-}
-
-export interface CategoryConfig {
-  name: string;
-  sections: SectionConfig[];
-}
-
-export type SchemaConfig = CategoryConfig[];
-
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.emitSchema = emitSchema;
 // Helper to preprocess config for faster lookup
-function createLookups(config: SchemaConfig) {
-  const categoryMap: Record<string, string> = {};
-  const visibleOptionsMap: Record<string, string[]> = {};
-  const categoryOrder: string[] = [];
-
-  config.forEach(cat => {
-    categoryOrder.push(cat.name);
-    cat.sections.forEach(sec => {
-      categoryMap[sec.name] = cat.name;
-      if (sec.visible) {
-        visibleOptionsMap[sec.name] = sec.visible;
-      }
+function createLookups(config) {
+    const categoryMap = {};
+    const visibleOptionsMap = {};
+    const categoryOrder = [];
+    config.forEach(cat => {
+        categoryOrder.push(cat.name);
+        cat.sections.forEach(sec => {
+            categoryMap[sec.name] = cat.name;
+            if (sec.visible) {
+                visibleOptionsMap[sec.name] = sec.visible;
+            }
+        });
     });
-  });
-
-  return { categoryMap, visibleOptionsMap, categoryOrder };
+    return { categoryMap, visibleOptionsMap, categoryOrder };
 }
-
-function emitSection(section: any, lookups: { categoryMap: Record<string, string>, visibleOptionsMap: Record<string, string[]> }): string {
-  const category = lookups.categoryMap[section.name] || 'Advanced';
-  const visibleOpts = lookups.visibleOptionsMap[section.name] || [];
-
-  const opts = section.options.map((o: any) => {
-    // Determine if Advanced
-    // If visibleOpts is empty/undefined, ALL are advanced? 
-    // User said: "items within a section that are not advanced"
-    // So if listed in visible, it's NOT advanced.
-    const isAdvanced = !visibleOpts.includes(o.key);
-
-    if (o.type === 'enum') {
-      return `{
+function emitSection(section, lookups) {
+    const category = lookups.categoryMap[section.name] || 'Advanced';
+    const visibleOpts = lookups.visibleOptionsMap[section.name] || [];
+    const opts = section.options.map((o) => {
+        // Determine if Advanced
+        // If visibleOpts is empty/undefined, ALL are advanced? 
+        // User said: "items within a section that are not advanced"
+        // So if listed in visible, it's NOT advanced.
+        const isAdvanced = !visibleOpts.includes(o.key);
+        if (o.type === 'enum') {
+            return `{
         key: '${o.key}',
         name: '${o.key}', 
         label: '${o.key}',
@@ -53,18 +36,16 @@ function emitSection(section: any, lookups: { categoryMap: Record<string, string
         options: ${JSON.stringify(o.enumValues)},
         advanced: ${isAdvanced},
       }`;
-    }
-
-    return `{
+        }
+        return `{
       key: '${o.key}',
       name: '${o.key}',
       label: '${o.key}',
       type: '${o.type === 'list' ? 'list' : o.type}',
       advanced: ${isAdvanced},
     }`;
-  });
-
-  return `
+    });
+    return `
   '${section.name}': {
     name: '${section.name}',
     label: '${section.name}',
@@ -74,28 +55,9 @@ function emitSection(section: any, lookups: { categoryMap: Record<string, string
     ],
   }`;
 }
-
-export interface ConfigOption {
-  key: string;
-  name: string;
-  label: string;
-  type: string;
-  options?: string[];
-  advanced?: boolean;
-  required?: boolean;
-  placeholder?: string;
-  dynamic_options?: string;
-  ini_name?: string;
-}
-
-export function emitSchema(
-  network: ManPageDef,
-  netdev: ManPageDef,
-  config: SchemaConfig
-): string {
-  const lookups = createLookups(config);
-
-  return `
+function emitSchema(network, netdev, config) {
+    const lookups = createLookups(config);
+    return `
 // GENERATED FILE - DO NOT EDIT
 // systemd ${network.unit} + ${netdev.unit}
 

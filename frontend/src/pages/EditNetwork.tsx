@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import type { NetworkConfig, NetDevConfig } from '../api/client';
 import { Save, ArrowLeft, Trash2, Plus, Monitor, Layers, ArrowRight, Check, ChevronDown, ChevronRight, Sliders } from 'lucide-react';
-import { NETWORK_SECTIONS, NETDEV_SECTIONS, NETDEV_KINDS, COMMON_NETDEV_KINDS, type ConfigOption } from './schema';
+import { NETWORK_SECTIONS, NETDEV_SECTIONS, NETDEV_KINDS, COMMON_NETDEV_KINDS, type ConfigOption, CATEGORY_ORDER } from './schema';
 
 interface SectionDef {
     name: string;
     label: string;
+    category: string;
     options: ConfigOption[];
     advanced?: boolean;
 }
@@ -30,8 +31,11 @@ const EditNetwork: React.FC = () => {
     const [mode, setMode] = useState<Mode>(initialMode);
     const [wizardStep, setWizardStep] = useState<WizardStep>('kind-selection');
     const [showAdvancedKinds, setShowAdvancedKinds] = useState(false);
-    const [showAdvancedSections, setShowAdvancedSections] = useState(false);
     const [advancedFieldToggles, setAdvancedFieldToggles] = useState<Record<string, boolean>>({});
+    // Category Toggle State
+    const [categoryToggles, setCategoryToggles] = useState<Record<string, boolean>>({
+        'Basic': true // Always open Basic by default
+    });
 
     // Config State
     const [filename, setFilename] = useState(paramFilename || '');
@@ -86,7 +90,7 @@ const EditNetwork: React.FC = () => {
             }
 
             // --- Auto-Expand Logic ---
-            let shouldShowAdvancedSections = false;
+
             const newFieldToggles: Record<string, boolean> = {};
 
             // Helper to check sections
@@ -97,14 +101,9 @@ const EditNetwork: React.FC = () => {
 
                     if (sectionData) {
                         // Check if the section itself is advanced and has content
-                        const hasContent = Object.keys(sectionData).some(k => {
-                            const val = sectionData[k];
-                            return Array.isArray(val) ? val.length > 0 : (val !== '' && val !== undefined);
-                        });
 
-                        if (def.advanced && hasContent) {
-                            shouldShowAdvancedSections = true;
-                        }
+
+
 
                         // Check for advanced fields within this section
                         const hasAdvancedFieldsPopulated = def.options.some(opt => {
@@ -125,7 +124,7 @@ const EditNetwork: React.FC = () => {
                 checkSections(typedNetdevSections, existingConfig);
             }
 
-            setShowAdvancedSections(shouldShowAdvancedSections);
+
             setAdvancedFieldToggles(newFieldToggles);
             // -------------------------
 
@@ -395,15 +394,34 @@ const EditNetwork: React.FC = () => {
         ? Object.keys(typedNetworkSections)
         : [...(NETDEV_KINDS[netdevKind] || ['NetDev']), ...Object.keys(typedNetworkSections)];
 
-    const basicTabs = availableTabs.filter(t => {
-        const schema = typedNetdevSections[t] || typedNetworkSections[t];
-        return !schema?.advanced;
-    });
+    // Group Tabs by Category (excluding Basic which is special, but for now treat consistent)
+    const groupedTabs = useMemo(() => {
+        const groups: Record<string, string[]> = {};
+        availableTabs.forEach(tab => {
+            const schema = typedNetdevSections[tab] || typedNetworkSections[tab];
+            const cat = schema?.category || 'Advanced';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(tab);
+        });
 
-    const advancedTabs = availableTabs.filter(t => {
-        const schema = typedNetdevSections[t] || typedNetworkSections[t];
-        return schema?.advanced;
-    });
+        // Ensure strictly ordered Categories
+        const orderedCategories = CATEGORY_ORDER;
+        const result: { category: string, tabs: string[] }[] = [];
+
+        orderedCategories.forEach(cat => {
+            if (groups[cat] && groups[cat].length > 0) {
+                result.push({ category: cat, tabs: groups[cat] });
+                delete groups[cat];
+            }
+        });
+
+        // Add any remaining
+        Object.keys(groups).forEach(cat => {
+            result.push({ category: cat, tabs: groups[cat] });
+        });
+
+        return result;
+    }, [availableTabs, mode, netdevKind]);
 
     // Ensure active tab is valid
     useEffect(() => {
@@ -656,55 +674,55 @@ const EditNetwork: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Basic Tabs */}
-                    <div style={{ marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 'bold', paddingLeft: '1rem' }}>BASIC CONFIG</div>
-                    {basicTabs.map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            style={{
-                                textAlign: 'left',
-                                padding: '0.8rem 1rem',
-                                background: activeTab === tab ? 'var(--bg-secondary)' : 'transparent',
-                                borderLeft: activeTab === tab ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                                color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                cursor: 'pointer',
-                                borderRight: 'none', borderTop: 'none', borderBottom: 'none'
-                            }}
-                        >
-                            {typedNetdevSections[tab]?.label || typedNetworkSections[tab]?.label || tab}
-                        </button>
-                    ))}
+                    {/* Grouped Sidebar with Accordions */}
+                    {groupedTabs.map(group => {
+                        const isBasic = group.category === 'Basic';
+                        const isExpanded = isBasic || categoryToggles[group.category] || group.tabs.includes(activeTab);
 
-                    {/* Advanced Tabs */}
-                    {advancedTabs.length > 0 && (
-                        <>
-                            <button
-                                onClick={() => setShowAdvancedSections(!showAdvancedSections)}
-                                style={{ marginTop: '1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 'bold', paddingLeft: '1rem', background: 'none', border: 'none', cursor: 'pointer' }}
-                            >
-                                {showAdvancedSections ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                ADVANCED SECTIONS
-                            </button>
-                            {showAdvancedSections && advancedTabs.map(tab => (
+                        return (
+                            <div key={group.category} style={{ marginBottom: '0.5rem' }}>
                                 <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
+                                    onClick={() => !isBasic && setCategoryToggles(prev => ({ ...prev, [group.category]: !isExpanded }))}
                                     style={{
-                                        textAlign: 'left',
-                                        padding: '0.8rem 1rem',
-                                        background: activeTab === tab ? 'var(--bg-secondary)' : 'transparent',
-                                        borderLeft: activeTab === tab ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                                        color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                        cursor: 'pointer',
-                                        borderRight: 'none', borderTop: 'none', borderBottom: 'none'
+                                        width: '100%',
+                                        marginTop: '0.5rem', marginBottom: '0.2rem',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                        color: isBasic ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                        fontSize: '0.8rem', fontWeight: 'bold',
+                                        padding: '0.5rem 1rem', background: 'var(--bg-tertiary)',
+                                        border: 'none', borderRadius: '4px', cursor: isBasic ? 'default' : 'pointer',
+                                        opacity: isBasic ? 1 : 0.9
                                     }}
                                 >
-                                    {typedNetdevSections[tab]?.label || typedNetworkSections[tab]?.label || tab}
+                                    {group.category.toUpperCase()}
+                                    {!isBasic && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                                 </button>
-                            ))}
-                        </>
-                    )}
+
+                                {isExpanded && (
+                                    <div style={{ paddingLeft: '0.5rem', display: 'flex', flexDirection: 'column' }}>
+                                        {group.tabs.map(tab => (
+                                            <button
+                                                key={tab}
+                                                onClick={() => setActiveTab(tab)}
+                                                style={{
+                                                    textAlign: 'left',
+                                                    padding: '0.6rem 1rem',
+                                                    background: activeTab === tab ? 'var(--bg-secondary)' : 'transparent',
+                                                    borderLeft: activeTab === tab ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                                                    color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                                    cursor: 'pointer',
+                                                    borderRight: 'none', borderTop: 'none', borderBottom: 'none',
+                                                    fontSize: '0.9rem'
+                                                }}
+                                            >
+                                                {typedNetdevSections[tab]?.label || typedNetworkSections[tab]?.label || tab}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
 
                 {/* Main Form */}
