@@ -10,6 +10,26 @@ The project consists of a Go backend that communicates with `systemd-networkd` (
 - **Node.js**: Version 18 or higher (for building the frontend)
 - **Linux**: Required for full functionality (D-Bus interaction). On macOS/Windows, the application runs in development mode with mock data or file-based operations only.
 
+#### Environment Setup
+
+To install the necessary dependencies (Go and Node.js) on various distributions:
+
+**Debian/Ubuntu (`apt`)**
+```bash
+sudo apt update
+sudo apt install golang nodejs npm
+```
+
+**Fedora (`dnf`)**
+```bash
+sudo dnf install golang nodejs
+```
+
+**Arch Linux (`pacman`)**
+```bash
+sudo pacman -S go nodejs npm
+```
+
 ## Installation & Running
 
 ### Backend
