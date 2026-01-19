@@ -1,0 +1,136 @@
+openapi: 3.0.0
+info:
+  title: Networkd API
+  description: API for managing systemd-networkd configurations and system state.
+  version: 1.2.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/interfaces:
+    get:
+      summary: List Active Interviews (Runtime)
+      description: Returns a list of all runtime network interfaces (physical and virtual).
+      responses:
+        '200':
+          description: List of runtime links
+  
+  /api/interfaces/netdevs:
+    get:
+      summary: List Virtual Device Definitions
+      description: Returns a list of all stored `.netdev` files.
+      responses:
+        '200':
+          description: List of netdev files
+
+  /api/interfaces/{filename}:
+    get:
+      summary: Get NetDev Configuration Content
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Configuration content
+    delete:
+      summary: Delete NetDev Configuration
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+
+  /api/networks:
+    get:
+      summary: List Network Configurations
+      description: Returns a list of all stored `.network` files.
+      responses:
+        '200':
+          description: List of network config files
+    post:
+      summary: Create Network Configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - filename
+                - config
+              properties:
+                filename:
+                  type: string
+                config:
+                  type: object
+      responses:
+        '201':
+          description: Created
+
+  /api/networks/{filename}:
+    get:
+      summary: Get Network Configuration Content
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Configuration content
+    delete:
+      summary: Delete Network Configuration
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+
+  # ... System routes omitted for brevity but understood to be present ...
+  /api/system/config:
+    get:
+      summary: Get global networkd.conf
+      responses:
+        '200':
+          description: Content
+    post:
+      summary: Save global networkd.conf
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Saved
+  /api/system/reload:
+    post:
+      summary: Reload systemd-networkd
+      responses:
+        '200':
+          description: Reload successful
+  /api/system/routes:
+    get:
+      summary: Get routing tables and rules
+      responses:
+        '200':
+          description: Output
+  /api/system/logs:
+    get:
+      summary: Get systemd-networkd logs
+      responses:
+        '200':
+          description: Log tail

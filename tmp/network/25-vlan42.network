@@ -1,0 +1,5 @@
+[Match]
+Name = vlan42
+
+[Network]
+DHCP = yes
