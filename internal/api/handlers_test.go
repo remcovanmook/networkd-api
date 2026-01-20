@@ -21,7 +21,7 @@ func TestHandlers(t *testing.T) {
 
 	svc := service.NewNetworkdService(tmpDir)
 	h := NewHandler(svc)
-	router := NewRouter(h)
+	router := NewRouter(h, "")
 
 	// Test 1: List Interfaces (Empty)
 	req := httptest.NewRequest("GET", "/api/interfaces", nil)
@@ -34,7 +34,9 @@ func TestHandlers(t *testing.T) {
 
 	// Test 2: Create Network
 	config := service.NetworkConfig{
-		Match:   service.MatchSection{Name: "eth0"},
+		Match: service.MatchSection{
+			Name: []string{"eth0"},
+		},
 		Network: service.NetworkSection{DHCP: "yes"},
 	}
 

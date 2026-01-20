@@ -15,7 +15,7 @@ func TestNetworkConfig_Validate(t *testing.T) {
 		{
 			name: "Valid Config",
 			config: NetworkConfig{
-				Match: MatchSection{Name: "eth0"},
+				Match: MatchSection{Name: []string{"eth0"}},
 				Network: NetworkSection{
 					Address: []string{"192.168.1.1/24"},
 					Gateway: []string{"192.168.1.254"},
@@ -30,12 +30,12 @@ func TestNetworkConfig_Validate(t *testing.T) {
 				Match: MatchSection{},
 			},
 			wantErr: true,
-			errMsg:  "Match section must have at least Name or MACAddress",
+			errMsg:  "Match section must have at least Name, OriginalName, or MACAddress",
 		},
 		{
 			name: "Invalid Address CIDR",
 			config: NetworkConfig{
-				Match: MatchSection{Name: "eth0"},
+				Match: MatchSection{Name: []string{"eth0"}},
 				Network: NetworkSection{
 					Address: []string{"192.168.1.1"}, // Missing mask, ParseCIDR requires mask or handled? net.ParseCIDR requires /
 				},
@@ -46,7 +46,7 @@ func TestNetworkConfig_Validate(t *testing.T) {
 		{
 			name: "Invalid Gateway IP",
 			config: NetworkConfig{
-				Match: MatchSection{Name: "eth0"},
+				Match: MatchSection{Name: []string{"eth0"}},
 				Network: NetworkSection{
 					Gateway: []string{"not-an-ip"},
 				},
@@ -57,7 +57,7 @@ func TestNetworkConfig_Validate(t *testing.T) {
 		{
 			name: "Invalid DNS IP",
 			config: NetworkConfig{
-				Match: MatchSection{Name: "eth0"},
+				Match: MatchSection{Name: []string{"eth0"}},
 				Network: NetworkSection{
 					DNS: []string{"8.8.8.8", "bad-ip"},
 				},

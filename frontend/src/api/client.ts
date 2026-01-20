@@ -80,8 +80,11 @@ export const apiClient = {
         const response = await axios.get<InterfaceFile[]>(`${API_Base}/networks`);
         return response.data;
     },
-    getNetwork: async (filename: string, type: 'network' | 'netdev' = 'network') => {
-        const endpoint = type === 'netdev' ? 'interfaces' : 'networks';
+    getNetwork: async (filename: string, type: 'network' | 'netdev' | 'link' = 'network') => {
+        let endpoint = 'networks';
+        if (type === 'netdev') endpoint = 'interfaces';
+        if (type === 'link') endpoint = 'links';
+
         const response = await axios.get<any>(`${API_Base}/${endpoint}/${filename}`);
         return response.data;
     },
@@ -111,5 +114,20 @@ export const apiClient = {
     getLogs: async () => {
         const response = await axios.get<{ logs: string }>(`${API_Base}/system/logs`);
         return response.data;
-    }
+    },
+
+    // Link Configuration (.link files)
+    getLinkConfigs: async () => {
+        const response = await axios.get<InterfaceFile[]>(`${API_Base}/links`);
+        return response.data;
+    },
+    createLink: async (filename: string, config: any) => {
+        const response = await axios.post(`${API_Base}/links`, { filename, config });
+        return response.data;
+    },
+    deleteLink: async (filename: string) => {
+        await axios.delete(`${API_Base}/links/${filename}`);
+    },
+
+
 };

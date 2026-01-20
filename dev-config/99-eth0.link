@@ -1,0 +1,6 @@
+[Match]
+OriginalName = eth0
+
+[Link]
+MTUBytes        = 15000
+AutoNegotiation = yes

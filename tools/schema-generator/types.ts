@@ -4,24 +4,34 @@ export type OptionType =
   | 'string'
   | 'number'
   | 'boolean'
-  | 'enum'
-  | 'list';
+  | 'select'
+  | 'list'
+  | 'ipv4'
+  | 'ipv6'
+  | 'ip'
+  | 'mac'
+  | 'duration'
+  | 'prefix'
+  | 'bytes';
 
 export interface OptionDef {
   key: string;
   description: string;
-  type: OptionType;
+  types: OptionType[];
   enumValues?: string[];
   multiple?: boolean;
   since?: string;
+  default?: string | number | boolean;
 }
 
 export interface SectionDef {
   name: string;
+  description?: string;
+  multiple?: boolean;
   options: OptionDef[];
 }
 
 export interface ManPageDef {
-  unit: 'network' | 'netdev';
+  unit: 'network' | 'netdev' | 'link';
   sections: SectionDef[];
 }

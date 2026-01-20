@@ -13,6 +13,7 @@ func main() {
 	staticDir := os.Getenv("STATIC_DIR")
 
 	svc := service.NewNetworkdService(configDir)
+	log.Printf("Using ConfigDir: %s", svc.ConfigDir)
 	h := api.NewHandler(svc)
 	r := api.NewRouter(h, staticDir)
 

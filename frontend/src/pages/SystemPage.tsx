@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { Save, RefreshCw, Terminal, Activity, FileText, Router as RouterIcon } from 'lucide-react';
+import { useToast } from '../components/ToastContext';
 
 type Tab = 'config' | 'routes' | 'logs';
 
 const SystemPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('config');
     const [configContent, setConfigContent] = useState('');
+    const { showToast } = useToast();
 
     // --- Queries ---
 
@@ -38,14 +40,14 @@ const SystemPage: React.FC = () => {
 
     const saveMutation = useMutation({
         mutationFn: apiClient.saveGlobalConfig,
-        onSuccess: () => alert('Global configuration saved.'),
-        onError: (err: any) => alert('Failed to save: ' + err.message)
+        onSuccess: () => showToast('Global configuration saved.', 'success'),
+        onError: (err: any) => showToast('Failed to save: ' + err.message, 'error')
     });
 
     const reloadMutation = useMutation({
         mutationFn: apiClient.reloadNetworkd,
-        onSuccess: (data) => alert('Reload Successful:\n' + data.output),
-        onError: (err: any) => alert('Reload Failed: ' + err.message)
+        onSuccess: () => showToast('Reload Successful', 'success'),
+        onError: (err: any) => showToast('Reload Failed: ' + err.message, 'error')
     });
 
     return (

@@ -2,8 +2,10 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"networkd-api/internal/service"
+	"os"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -30,7 +32,44 @@ func (h *Handler) ListNetDevs(w http.ResponseWriter, r *http.Request) {
 
 // ListConfigs returns list of .network config files
 func (h *Handler) ListConfigs(w http.ResponseWriter, r *http.Request) {
-	files, err := h.Service.ListNetworkConfigs()
+	name := r.URL.Query().Get("name")
+	mac := r.URL.Query().Get("macaddress")
+	matchType := r.URL.Query().Get("type")
+
+	var criteria *service.MatchCriteria
+	if name != "" || mac != "" || matchType != "" {
+		criteria = &service.MatchCriteria{
+			Name:       name,
+			MACAddress: mac,
+			Type:       matchType,
+		}
+	}
+
+	files, err := h.Service.ListNetworkConfigs(criteria)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(files)
+}
+
+// ListLinkConfigs returns list of .link config files
+func (h *Handler) ListLinkConfigs(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	mac := r.URL.Query().Get("macaddress")
+	matchType := r.URL.Query().Get("type")
+
+	var criteria *service.MatchCriteria
+	if name != "" || mac != "" || matchType != "" {
+		criteria = &service.MatchCriteria{
+			Name:       name,
+			MACAddress: mac,
+			Type:       matchType,
+		}
+	}
+
+	files, err := h.Service.ListLinkConfigs(criteria)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -58,11 +97,6 @@ func (h *Handler) GetNetworkConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Try to parse as NetworkConfig first, if fails try NetDevConfig?
-	// But /api/networks/{filename} implies .network.
-	// We might need /api/interfaces/{filename} for .netdev.
-	// For now, simple logic: check suffix or try both.
-
 	if strings.HasSuffix(filename, ".network") {
 		config, err := service.ParseNetworkConfig(content)
 		if err != nil {
@@ -73,6 +107,14 @@ func (h *Handler) GetNetworkConfig(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(config)
 	} else if strings.HasSuffix(filename, ".netdev") {
 		config, err := service.ParseNetDevConfig(content)
+		if err != nil {
+			http.Error(w, "Failed to parse file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(config)
+	} else if strings.HasSuffix(filename, ".link") {
+		config, err := service.ParseLinkConfig(content)
 		if err != nil {
 			http.Error(w, "Failed to parse file: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -92,6 +134,11 @@ type createNetworkRequest struct {
 type createNetDevRequest struct {
 	Filename string                `json:"filename"`
 	Config   *service.NetDevConfig `json:"config"`
+}
+
+type createLinkRequest struct {
+	Filename string              `json:"filename"`
+	Config   *service.LinkConfig `json:"config"`
 }
 
 // CreateNetwork handles POST /api/networks (Creates .network file only)
@@ -125,6 +172,39 @@ func (h *Handler) CreateNetwork(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Network configuration created"})
+}
+
+// CreateLink handles POST /api/links (Creates .link file only)
+func (h *Handler) CreateLink(w http.ResponseWriter, r *http.Request) {
+	var req createLinkRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Filename == "" || req.Config == nil {
+		http.Error(w, "Filename and config are required", http.StatusBadRequest)
+		return
+	}
+	// Enforce .link suffix
+	if !strings.HasSuffix(req.Filename, ".link") {
+		req.Filename += ".link"
+	}
+
+	content, err := service.GenerateLinkConfig(req.Config)
+	if err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.WriteNetworkFile(req.Filename, content); err != nil {
+		http.Error(w, "Failed to write link file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Link configuration created"})
 }
 
 // CreateNetDev handles POST /api/interfaces (Creates .netdev file only)
@@ -167,4 +247,39 @@ func (h *Handler) DeleteNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// GetViewConfig returns the UI layout configuration
+func (h *Handler) GetViewConfig(w http.ResponseWriter, r *http.Request) {
+	config, err := h.Service.GetViewConfig()
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.Error(w, "View config not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(config)
+}
+
+// SaveViewConfig saves the UI layout configuration
+func (h *Handler) SaveViewConfig(w http.ResponseWriter, r *http.Request) {
+	// Read raw body since we are just saving JSON to file
+	// Limit body size to avoid DoS
+	r.Body = http.MaxBytesReader(w, r.Body, 1024*1024) // 1MB max for config
+	content, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.SaveViewConfig(content); err != nil {
+		http.Error(w, "Failed to save config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "View configuration saved"})
 }

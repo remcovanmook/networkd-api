@@ -39,12 +39,22 @@ func NewRouter(h *Handler, staticDir string) http.Handler {
 		r.Get("/networks/{filename}", h.GetNetworkConfig)
 		r.Delete("/networks/{filename}", h.DeleteNetwork)
 
+		// Links (Hardware Configuration)
+		r.Get("/links", h.ListLinkConfigs) // Link Configurations (.link)
+		r.Post("/links", h.CreateLink)
+		r.Get("/links/{filename}", h.GetNetworkConfig)
+		r.Delete("/links/{filename}", h.DeleteNetwork)
+
 		// System Management
 		r.Get("/system/config", h.GetGlobalConfig)
 		r.Post("/system/config", h.SaveGlobalConfig)
+		r.Get("/system/view-config", h.GetViewConfig)
+		r.Post("/system/view-config", h.SaveViewConfig)
 		r.Post("/system/reload", h.ReloadNetworkd)
 		r.Get("/system/routes", h.GetRoutes)
+		r.Get("/system/routes", h.GetRoutes)
 		r.Get("/system/logs", h.GetLogs)
+
 	})
 
 	// Serve Static Files (SPA) if staticDir is configured

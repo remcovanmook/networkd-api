@@ -1,14 +1,15 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Network, Settings, FileCode } from 'lucide-react';
+import { LayoutDashboard, Network, Settings, FileCode, Sliders } from 'lucide-react';
 
 const Layout: React.FC = () => {
     const location = useLocation();
 
     const navItems = [
-        { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-        { label: 'Interfaces', path: '/interfaces', icon: Network },
+        { label: 'Overview', path: '/', icon: LayoutDashboard },
+        { label: 'Configuration', path: '/configuration', icon: Network },
         { label: 'System', path: '/system', icon: Settings },
+        { label: 'Preferences', path: '/preferences', icon: Sliders },
         { label: 'API Specs', path: '/api-docs', icon: FileCode },
     ];
 

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -132,18 +133,72 @@ type FileInfo struct {
 	Summary          *ConfigSummary `json:"summary,omitempty"`
 }
 
-// ListNetDevs returns a list of .netdev files with metadata
-func (s *NetworkdService) ListNetDevs() ([]FileInfo, error) {
-	return s.listFiles(".netdev")
+// MatchCriteria defines filters for listing configs
+type MatchCriteria struct {
+	Name       string
+	MACAddress string
+	Type       string
 }
 
-// ListNetworkConfigs returns a list of .network files with metadata
-func (s *NetworkdService) ListNetworkConfigs() ([]FileInfo, error) {
-	return s.listFiles(".network")
+// matches checks if the config match section satisfies the criteria
+// matches checks if the config match section satisfies the criteria
+func (c *MatchCriteria) matches(matchName []string, matchMAC []string, matchType []string) bool {
+	if c.Name != "" {
+		found := false
+		for _, name := range matchName {
+			if name == c.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	if c.MACAddress != "" {
+		found := false
+		for _, mac := range matchMAC {
+			if strings.EqualFold(mac, c.MACAddress) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	if c.Type != "" {
+		found := false
+		for _, typ := range matchType {
+			if strings.EqualFold(typ, c.Type) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// ListNetDevs returns a list of .netdev files with metadata
+func (s *NetworkdService) ListNetDevs() ([]FileInfo, error) {
+	return s.listFiles(".netdev", nil)
+}
+
+// ListNetworkConfigs returns a list of .network files with metadata (optional filter)
+func (s *NetworkdService) ListNetworkConfigs(criteria *MatchCriteria) ([]FileInfo, error) {
+	return s.listFiles(".network", criteria)
+}
+
+// ListLinkConfigs returns a list of .link files with metadata (optional filter)
+func (s *NetworkdService) ListLinkConfigs(criteria *MatchCriteria) ([]FileInfo, error) {
+	return s.listFiles(".link", criteria)
 }
 
 // listFiles is a helper to list files by suffix
-func (s *NetworkdService) listFiles(suffix string) ([]FileInfo, error) {
+func (s *NetworkdService) listFiles(suffix string, criteria *MatchCriteria) ([]FileInfo, error) {
 	var files []FileInfo
 	entries, err := os.ReadDir(s.ConfigDir)
 	if err != nil {
@@ -160,7 +215,16 @@ func (s *NetworkdService) listFiles(suffix string) ([]FileInfo, error) {
 					if err == nil {
 						cfg, _ := ParseNetworkConfig(content)
 						if cfg != nil {
-							info.NetworkMatchName = cfg.Match.Name
+							// Apply Filter if present
+							if criteria != nil {
+								if !criteria.matches(cfg.Match.Name, cfg.Match.MACAddress, cfg.Match.Type) {
+									continue
+								}
+							}
+
+							if len(cfg.Match.Name) > 0 {
+								info.NetworkMatchName = strings.Join(cfg.Match.Name, ", ")
+							}
 							info.Summary = &ConfigSummary{
 								DHCP:    cfg.Network.DHCP,
 								Address: cfg.Network.Address,
@@ -171,6 +235,7 @@ func (s *NetworkdService) listFiles(suffix string) ([]FileInfo, error) {
 					}
 					files = append(files, info)
 				} else if suffix == ".netdev" {
+					// NetDevs don't really have Match sections
 					info := FileInfo{Filename: name, Type: "netdev"}
 					content, err := s.ReadNetworkFile(name)
 					if err == nil {
@@ -183,6 +248,29 @@ func (s *NetworkdService) listFiles(suffix string) ([]FileInfo, error) {
 								id := cfg.VLAN.Id
 								info.Summary.VlanId = &id
 							}
+						}
+					}
+					files = append(files, info)
+				} else if suffix == ".link" {
+					info := FileInfo{Filename: name, Type: "link"}
+					content, err := s.ReadNetworkFile(name)
+					if err == nil {
+						cfg, _ := ParseLinkConfig(content)
+						if cfg != nil {
+							// Apply Filter if present
+							if criteria != nil {
+								if !criteria.matches(cfg.Match.Name, cfg.Match.MACAddress, cfg.Match.Type) {
+									continue
+								}
+							}
+
+							// For link files, we might want to show what they match
+							if len(cfg.Match.Name) > 0 {
+								info.NetworkMatchName = "Match: " + strings.Join(cfg.Match.Name, ", ")
+							} else if len(cfg.Match.MACAddress) > 0 {
+								info.NetworkMatchName = "Match: " + strings.Join(cfg.Match.MACAddress, ", ")
+							}
+							info.Summary = &ConfigSummary{}
 						}
 					}
 					files = append(files, info)
@@ -225,4 +313,26 @@ func (s *NetworkdService) DeleteNetworkFile(filename string) error {
 	}
 	path := filepath.Join(s.ConfigDir, filename)
 	return os.Remove(path)
+}
+
+// GetViewConfig reads the UI layout configuration
+func (s *NetworkdService) GetViewConfig() ([]byte, error) {
+	// Look for .schema-config.json in the config directory
+	path := filepath.Join(s.ConfigDir, ".schema-config.json")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return content, nil
+}
+
+// SaveViewConfig saves the UI layout configuration
+func (s *NetworkdService) SaveViewConfig(content []byte) error {
+	// Validate JSON?
+	if !json.Valid(content) {
+		return fmt.Errorf("invalid json")
+	}
+	path := filepath.Join(s.ConfigDir, ".schema-config.json")
+	fmt.Printf("Saving view config to: %s\n", path)
+	return os.WriteFile(path, content, 0644)
 }

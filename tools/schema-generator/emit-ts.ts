@@ -1,66 +1,68 @@
 // tools/schema-generator/emit-ts.ts
 
 import { ManPageDef } from './types';
+// Use require for JSON to avoid import assertion issues in this setup
+const descriptions = require('./descriptions.json');
 
-export interface SectionConfig {
-  name: string;
-  visible?: string[];
+// Helper to get doc URL
+function getDocUrl(unit: string, sectionName: string): string {
+  // Unit mapping to man page names
+  // network -> systemd.network
+  // netdev -> systemd.netdev
+  // link -> systemd.link
+  const page = `systemd.${unit}`;
+
+  // Freedesktop format: #%5BSection%5D%20Section%20Options
+  const anchor = `%5B${sectionName}%5D%20Section%20Options`;
+  return `https://www.freedesktop.org/software/systemd/man/257/${page}.html#${anchor}`;
 }
 
-export interface CategoryConfig {
-  name: string;
-  sections: SectionConfig[];
-}
+// Helper to emit a section without external config
+function emitSection(section: any, unit: string): string {
+  // We emit ALL options found in the manpage.
 
-export type SchemaConfig = CategoryConfig[];
-
-// Helper to preprocess config for faster lookup
-function createLookups(config: SchemaConfig) {
-  const categoryMap: Record<string, string> = {};
-  const visibleOptionsMap: Record<string, string[]> = {};
-  const categoryOrder: string[] = [];
-
-  config.forEach(cat => {
-    categoryOrder.push(cat.name);
-    cat.sections.forEach(sec => {
-      categoryMap[sec.name] = cat.name;
-      if (sec.visible) {
-        visibleOptionsMap[sec.name] = sec.visible;
-      }
-    });
-  });
-
-  return { categoryMap, visibleOptionsMap, categoryOrder };
-}
-
-function emitSection(section: any, lookups: { categoryMap: Record<string, string>, visibleOptionsMap: Record<string, string[]> }): string {
-  const category = lookups.categoryMap[section.name] || 'Advanced';
-  const visibleOpts = lookups.visibleOptionsMap[section.name] || [];
+  // Check for description override
+  const sectionOverride = (descriptions as any)[section.name];
+  const descOverride = sectionOverride?.description;
+  const description = descOverride || section.description || '';
+  const docUrl = getDocUrl(unit, section.name);
 
   const opts = section.options.map((o: any) => {
-    // Determine if Advanced
-    // If visibleOpts is empty/undefined, ALL are advanced? 
-    // User said: "items within a section that are not advanced"
-    // So if listed in visible, it's NOT advanced.
-    const isAdvanced = !visibleOpts.includes(o.key);
-
-    if (o.type === 'enum') {
-      return `{
-        key: '${o.key}',
-        name: '${o.key}', 
-        label: '${o.key}',
-        type: 'select',
-        options: ${JSON.stringify(o.enumValues)},
-        advanced: ${isAdvanced},
-      }`;
+    // Determine primary type for UI
+    let primaryType = 'string';
+    if (o.types.length === 1) {
+      primaryType = o.types[0];
+    } else {
+      primaryType = 'string';
     }
+
+    if (o.types.includes('list')) {
+      primaryType = 'list';
+    } else if (o.types.includes('select')) {
+      if (o.types.length === 1) primaryType = 'select';
+    }
+
+    // Option Overrides
+    const optOverride = sectionOverride?.options?.[o.key];
+    const optDesc = optOverride?.description || o.description || '';
+    const optRequired = optOverride?.required || false;
+
+    if (optOverride?.type) {
+      primaryType = optOverride.type;
+    }
+    const enumValues = optOverride?.options || o.enumValues;
 
     return `{
       key: '${o.key}',
-      name: '${o.key}',
+      name: '${o.key}', 
       label: '${o.key}',
-      type: '${o.type === 'list' ? 'list' : o.type}',
-      advanced: ${isAdvanced},
+      description: ${JSON.stringify(optDesc)},
+      type: '${primaryType}',
+      types: ${JSON.stringify(o.types)},
+      options: ${JSON.stringify(enumValues)},
+      advanced: false, // Controlled by frontend View Config
+      required: ${optRequired},
+      default: ${JSON.stringify(o.default)},
     }`;
   });
 
@@ -68,7 +70,9 @@ function emitSection(section: any, lookups: { categoryMap: Record<string, string
   '${section.name}': {
     name: '${section.name}',
     label: '${section.name}',
-    category: '${category}',
+    description: ${JSON.stringify(description)},
+    docUrl: '${docUrl}',
+    multiple: ${section.multiple || false},
     options: [
       ${opts.join(',\n')}
     ],
@@ -79,6 +83,7 @@ export interface ConfigOption {
   key: string;
   name: string;
   label: string;
+  description?: string;
   type: string;
   options?: string[];
   advanced?: boolean;
@@ -91,23 +96,23 @@ export interface ConfigOption {
 export function emitSchema(
   network: ManPageDef,
   netdev: ManPageDef,
-  config: SchemaConfig
+  link: ManPageDef | undefined,
 ): string {
-  const lookups = createLookups(config);
 
   return `
 // GENERATED FILE - DO NOT EDIT
-// systemd ${network.unit} + ${netdev.unit}
-
-// Derived from schema-config.json
-export const CATEGORY_ORDER = ${JSON.stringify([...lookups.categoryOrder, 'Advanced'])};
+// systemd ${network.unit} + ${netdev.unit} ${link ? '+ ' + link.unit : ''}
 
 export const NETWORK_SECTIONS = {
-${network.sections.map(s => emitSection(s, lookups)).join(',')}
+${network.sections.map(s => emitSection(s, 'network')).join(',')}
 };
 
 export const NETDEV_SECTIONS = {
-${netdev.sections.map(s => emitSection(s, lookups)).join(',')}
+${netdev.sections.map(s => emitSection(s, 'netdev')).join(',')}
+};
+
+export const LINK_SECTIONS = {
+${link ? link.sections.map(s => emitSection(s, 'link')).join(',') : ''}
 };
 
 // STATIC DEFINITIONS APPENDED BY GENERATOR
@@ -116,13 +121,16 @@ export interface ConfigOption {
     key: string;
     name: string;
     label: string;
-    type: string;
+    description?: string;
+    type: 'string' | 'number' | 'boolean' | 'select' | 'list' | 'ipv4' | 'ipv6' | 'ip' | 'mac' | 'duration' | 'bytes' | 'prefix';
+    types?: string[];
     options?: string[];
     advanced?: boolean;
     required?: boolean;
     placeholder?: string;
     dynamic_options?: string;
     ini_name?: string;
+    default?: string | number | boolean;
 }
 
 export const COMMON_NETDEV_KINDS = ['bridge', 'bond', 'vlan', 'vxlan', 'wireguard', 'macvlan', 'dummy', 'tun', 'tap', 'veth'];

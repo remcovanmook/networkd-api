@@ -1,21 +1,16 @@
 import { parseManPage } from './parse-manpage';
-import { emitSchema, SchemaConfig } from './emit-ts';
-import fs from 'fs';
-import path from 'path';
+import { emitSchema } from './emit-ts';
 
-// Load Config
-const configPath = path.resolve(__dirname, '../schema-config.json');
-const config: SchemaConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-
-const [networkHtml, netdevHtml] = process.argv.slice(2);
+const [networkHtml, netdevHtml, linkHtml] = process.argv.slice(2);
 
 if (!networkHtml || !netdevHtml) {
-  console.error('Usage: node index.js systemd.network.html systemd.netdev.html');
+  console.error('Usage: node index.js systemd.network.html systemd.netdev.html [systemd.link.html]');
   process.exit(1);
 }
 
 const network = parseManPage(networkHtml, 'network');
 const netdev = parseManPage(netdevHtml, 'netdev');
+const link = linkHtml ? parseManPage(linkHtml, 'link') : undefined;
 
-const ts = emitSchema(network, netdev, config);
+const ts = emitSchema(network, netdev, link);
 process.stdout.write(ts);

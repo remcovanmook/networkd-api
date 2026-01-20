@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
-import { ArrowLeft, Trash2, ExternalLink, ChevronDown, ChevronRight, Save, Plus } from 'lucide-react';
-import { NETWORK_SECTIONS, type ConfigOption } from './schema';
+import { ArrowLeft, Trash2, ExternalLink, ChevronDown, ChevronRight, Save } from 'lucide-react';
+import { LINK_SECTIONS, type ConfigOption } from './schema';
 import { useViewConfig } from '../hooks/useViewConfig';
 import { useToast } from '../components/ToastContext';
 import { ConfigField } from '../components/ConfigField';
@@ -17,9 +17,9 @@ interface SectionDef {
     multiple?: boolean;
     options: ConfigOption[];
 }
-const typedNetworkSections = NETWORK_SECTIONS as unknown as Record<string, SectionDef>;
+const typedLinkSections = LINK_SECTIONS as unknown as Record<string, SectionDef>;
 
-const EditNetwork: React.FC = () => {
+const EditLink: React.FC = () => {
     const navigate = useNavigate();
     const { filename: paramFilename } = useParams();
     const [searchParams] = useSearchParams();
@@ -31,21 +31,22 @@ const EditNetwork: React.FC = () => {
 
     // UI State
     const [activeTab, setActiveTab] = useState<string>('Match');
-    const [categoryToggles, setCategoryToggles] = useState<Record<string, boolean>>({ 'Basic': true });
+    const [categoryToggles, setCategoryToggles] = useState<Record<string, boolean>>({
+        'Basic': true
+    });
     const [advancedFieldToggles, setAdvancedFieldToggles] = useState<Record<string, boolean>>({});
 
     // Config State
     const [filename, setFilename] = useState(paramFilename || '');
     const [config, setConfig] = useState<any>({
-        Match: { Name: searchParams.get('match') || '' },
-        Network: { DHCP: 'yes' }
+        Match: { OriginalName: searchParams.get('match') || '' }
     });
 
-    // Determine config to use (NETWORK only)
+    // Determine config to use (LINK only)
     const viewConfigLookup = useMemo(() => {
         const lookup: Record<string, string[]> = {};
-        if (viewConfig && viewConfig.network) {
-            viewConfig.network.forEach(cat => {
+        if (viewConfig && viewConfig.link) {
+            viewConfig.link.forEach(cat => {
                 cat.sections.forEach(sec => {
                     lookup[sec.name] = sec.visible || [];
                 });
@@ -54,16 +55,10 @@ const EditNetwork: React.FC = () => {
         return lookup;
     }, [viewConfig]);
 
-    // Fetch Interfaces (for dropdowns)
-    const { data: interfaceFiles } = useQuery({
-        queryKey: ['netdevs'],
-        queryFn: apiClient.getNetDevs
-    });
-
     // Fetch existing configuration
     const { data: existingConfig, isSuccess: isLoaded } = useQuery({
-        queryKey: ['network', paramFilename],
-        queryFn: () => apiClient.getNetwork(paramFilename!, 'network'),
+        queryKey: ['link', paramFilename],
+        queryFn: () => apiClient.getNetwork(paramFilename!, 'link'),
         enabled: !!paramFilename,
         retry: false
     });
@@ -74,10 +69,10 @@ const EditNetwork: React.FC = () => {
             setFilename(paramFilename);
             setConfig(existingConfig);
 
-            // Auto-Expand Advanced
+            // Auto-Expand Advanced Fields
             const newFieldToggles: Record<string, boolean> = {};
-            Object.keys(typedNetworkSections).forEach(key => {
-                const def = typedNetworkSections[key];
+            Object.keys(typedLinkSections).forEach(key => {
+                const def = typedLinkSections[key];
                 const sectionName = def.name || key;
                 const sectionData = existingConfig[sectionName];
                 if (sectionData) {
@@ -92,13 +87,13 @@ const EditNetwork: React.FC = () => {
                 }
             });
             setAdvancedFieldToggles(newFieldToggles);
-
         } else if (!paramFilename) {
+            // New File Initialization
             const match = searchParams.get('match');
             if (match) {
                 setConfig((prev: any) => ({
                     ...prev,
-                    Match: { ...prev.Match, Name: match }
+                    Match: { ...prev.Match, OriginalName: match }
                 }));
             }
         }
@@ -107,21 +102,22 @@ const EditNetwork: React.FC = () => {
     // Smart Naming Logic
     useEffect(() => {
         if (!paramFilename) {
-            const name = config.Match?.Name || '';
+            const name = config.Match?.OriginalName || config.Match?.Name || '';
             if (name) {
-                setFilename(`10-${name}.network`);
+                setFilename(`99-${name}.link`);
             }
         }
-    }, [config.Match?.Name, paramFilename]);
+    }, [config.Match?.OriginalName, config.Match?.Name, paramFilename]);
+
 
     // Tabs Logic
     const groupedTabs = useMemo(() => {
-        if (!viewConfig || !viewConfig.network) return [];
+        if (!viewConfig || !viewConfig.link) return [];
         const result: { category: string, tabs: string[] }[] = [];
         const usedTabs = new Set<string>();
-        const availableTabs = Object.keys(typedNetworkSections);
+        const availableTabs = Object.keys(typedLinkSections);
 
-        viewConfig.network.forEach(cat => {
+        viewConfig.link.forEach(cat => {
             const catTabs: string[] = [];
             cat.sections.forEach(sec => {
                 const foundTab = availableTabs.find(t => t === sec.name);
@@ -155,51 +151,38 @@ const EditNetwork: React.FC = () => {
         });
     };
 
-    const addSectionItem = (section: string) => {
-        setConfig((prev: any) => {
-            const arr = Array.isArray(prev[section]) ? [...prev[section]] : (prev[section] ? [prev[section]] : []);
-            arr.push({});
-            return { ...prev, [section]: arr };
-        });
-    };
-    const removeSectionItem = (section: string, index: number) => {
-        setConfig((prev: any) => {
-            const arr = Array.isArray(prev[section]) ? [...prev[section]] : [];
-            return { ...prev, [section]: arr.filter((_: any, i: number) => i !== index) };
-        });
-    };
-
     const mutationLocal = useMutation({
         mutationFn: async (data: { filename: string, config: any }) => {
-            return apiClient.createNetwork(data.filename, data.config);
+            return apiClient.createLink(data.filename, data.config);
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['networks'] });
-            await queryClient.invalidateQueries({ queryKey: ['configs'] }); // refresh dashboard
-            showToast('Network configuration saved', 'success');
-            navigate('/configuration');
+            await queryClient.invalidateQueries({ queryKey: ['links'] });
+            await queryClient.invalidateQueries({ queryKey: ['interfaces'] }); // refresh list
+            showToast('Link configuration saved', 'success');
+            navigate('/interfaces');
         },
         onError: (err: any) => showToast(`Failed: ${err.message}`, 'error')
     });
 
     const deleteMutation = useMutation({
-        mutationFn: async (fname: string) => apiClient.deleteNetwork(fname),
+        mutationFn: async (fname: string) => apiClient.deleteLink(fname),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['networks'] });
-            await queryClient.invalidateQueries({ queryKey: ['configs'] });
-            showToast('Network configuration deleted', 'success');
-            navigate('/configuration');
+            await queryClient.invalidateQueries({ queryKey: ['links'] });
+            await queryClient.invalidateQueries({ queryKey: ['interfaces'] });
+            showToast('Link deleted', 'success');
+            navigate('/interfaces');
         }
     });
 
-    const currentSectionSchema = typedNetworkSections[activeTab];
+    const currentSectionSchema = typedLinkSections[activeTab];
     const visibleOptions = viewConfigLookup[activeTab];
     const hasAdvancedFields = currentSectionSchema?.options.some(o => visibleOptions ? !visibleOptions.includes(o.key) : false);
     const isSectionAdvancedToggleOn = advancedFieldToggles[currentSectionSchema?.name || ''];
 
+
     return (
         <div style={{
-            height: 'calc(100vh - 64px)', // Deduct header height approx
+            height: 'calc(100vh - 64px)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden'
@@ -216,13 +199,13 @@ const EditNetwork: React.FC = () => {
             }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <Link to="/configuration"><button style={{ padding: '0.5rem', display: 'flex', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}><ArrowLeft /></button></Link>
-                        <h1>{paramFilename ? 'Edit Network' : 'New Network'}</h1>
+                        <Link to="/interfaces"><button style={{ padding: '0.5rem', display: 'flex', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}><ArrowLeft /></button></Link>
+                        <h1>{paramFilename ? 'Edit Link' : 'New Link'}</h1>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         {paramFilename && (
                             <button
-                                onClick={() => { if (paramFilename && confirm('Delete this network config?')) deleteMutation.mutate(paramFilename); }}
+                                onClick={() => { if (paramFilename && confirm('Delete this link config?')) deleteMutation.mutate(paramFilename); }}
                                 style={{ backgroundColor: 'var(--error)', color: 'white', padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                             >
                                 <Trash2 size={16} /> Delete
@@ -232,7 +215,7 @@ const EditNetwork: React.FC = () => {
                             onClick={() => mutationLocal.mutate({ filename, config })}
                             style={{ backgroundColor: 'var(--accent-primary)', color: 'white', padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                         >
-                            <Save size={16} /> Save Network
+                            <Save size={16} /> Save Link
                         </button>
                     </div>
                 </header>
@@ -278,7 +261,7 @@ const EditNetwork: React.FC = () => {
                                                         fontSize: '0.9rem'
                                                     }}
                                                 >
-                                                    {typedNetworkSections[tab]?.label || tab}
+                                                    {typedLinkSections[tab]?.label || tab}
                                                 </button>
                                             ))}
                                         </div>
@@ -298,7 +281,13 @@ const EditNetwork: React.FC = () => {
                                 )}
                             </h2>
                         </div>
+                        {currentSectionSchema?.description && (
+                            <p style={{ marginTop: 0, marginBottom: '2rem', color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5', maxWidth: '700px' }}>
+                                {currentSectionSchema.description}
+                            </p>
+                        )}
 
+                        {/* Filename Display in Match */}
                         {activeTab === 'Match' && (
                             <div style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '6px' }}>
                                 <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>TARGET FILENAME (AUTO-GENERATED)</label>
@@ -306,48 +295,22 @@ const EditNetwork: React.FC = () => {
                             </div>
                         )}
 
-                        {currentSectionSchema && (
-                            currentSectionSchema.multiple ? (
-                                <div>
-                                    {(config[currentSectionSchema.name] || []).map((_: any, idx: number) => (
-                                        <div key={idx} style={{ marginBottom: '2rem', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '8px', position: 'relative' }}>
-                                            <button onClick={() => removeSectionItem(currentSectionSchema.name, idx)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: 'var(--error)', cursor: 'pointer' }}><Trash2 size={16} /></button>
-                                            {currentSectionSchema.options.map(opt => (
-                                                <ConfigField
-                                                    key={opt.key}
-                                                    option={opt}
-                                                    sectionName={currentSectionSchema.name}
-                                                    value={((config[currentSectionSchema.name] || [])[idx] || {})[opt.name]}
-                                                    onChange={(val) => updateConfig(currentSectionSchema.name, opt.name, val, idx)}
-                                                    interfaceFiles={interfaceFiles}
-                                                />
-                                            ))}
-                                        </div>
-                                    ))}
-                                    <button onClick={() => addSectionItem(currentSectionSchema.name)} style={{ background: 'var(--bg-tertiary)', border: '1px dashed var(--border-color)', width: '100%', padding: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                                        <Plus size={16} /> Add {currentSectionSchema.label}
-                                    </button>
-                                </div>
-                            ) : (
-                                currentSectionSchema.options.map(opt => {
-                                    const isAdvanced = visibleOptions ? !visibleOptions.includes(opt.key) : true;
-                                    if (isAdvanced && !isSectionAdvancedToggleOn) return null;
+                        {currentSectionSchema && currentSectionSchema.options.map(opt => {
+                            const isAdvanced = visibleOptions ? !visibleOptions.includes(opt.key) : true;
+                            if (isAdvanced && !isSectionAdvancedToggleOn) return null;
 
-                                    return (
-                                        <ConfigField
-                                            key={opt.key}
-                                            option={opt}
-                                            sectionName={currentSectionSchema.name}
-                                            value={(config[currentSectionSchema.name] || {})[opt.name]}
-                                            onChange={(val) => updateConfig(currentSectionSchema.name, opt.name, val)}
-                                            interfaceFiles={interfaceFiles}
-                                        />
-                                    );
-                                })
-                            )
-                        )}
+                            return (
+                                <ConfigField
+                                    key={opt.key}
+                                    option={opt}
+                                    sectionName={currentSectionSchema.name}
+                                    value={(config[currentSectionSchema.name] || {})[opt.name]}
+                                    onChange={(val) => updateConfig(currentSectionSchema.name, opt.name, val)}
+                                />
+                            );
+                        })}
 
-                        {hasAdvancedFields && !currentSectionSchema?.multiple && (
+                        {hasAdvancedFields && (
                             <button
                                 onClick={() => setAdvancedFieldToggles(prev => ({ ...prev, [currentSectionSchema.name]: !isSectionAdvancedToggleOn }))}
                                 style={{
@@ -365,13 +328,13 @@ const EditNetwork: React.FC = () => {
 
             {/* Fixed Live Preview Pane (Lower Third) */}
             <LivePreview
-                type="network"
+                type="link"
                 config={config}
-                sections={typedNetworkSections}
+                sections={typedLinkSections}
                 style={{ height: '18vh', width: '100%', zIndex: 10 }}
             />
         </div>
     );
 };
 
-export default EditNetwork;
+export default EditLink;
