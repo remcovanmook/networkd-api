@@ -5,6 +5,7 @@ import { Save, RefreshCw, Terminal, Activity, FileText, Router as RouterIcon } f
 import { useToast } from '../components/ToastContext';
 
 import { useHost } from '../contexts/HostContext';
+import { useSchema } from '../contexts/SchemaContext';
 
 type Tab = 'config' | 'routes' | 'logs';
 
@@ -13,6 +14,7 @@ const SystemPage: React.FC = () => {
     const [configContent, setConfigContent] = useState('');
     const { showToast } = useToast();
     const { currentHost } = useHost();
+    const { systemdVersion, realSystemdVersion } = useSchema();
 
     // --- Queries ---
 
@@ -56,7 +58,17 @@ const SystemPage: React.FC = () => {
     return (
         <div>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h1>System Management</h1>
+                <div>
+                    <h1 style={{ marginBottom: '0.2rem' }}>System Management</h1>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                        Systemd: <span style={{ color: 'var(--text-primary)' }}>{realSystemdVersion}</span>
+                        {realSystemdVersion !== systemdVersion && (
+                            <span style={{ marginLeft: '0.5rem', color: 'var(--accent-primary)' }}>
+                                (Schema: {systemdVersion})
+                            </span>
+                        )}
+                    </div>
+                </div>
                 <button
                     onClick={() => reloadMutation.mutate()}
                     disabled={reloadMutation.isPending}

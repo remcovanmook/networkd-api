@@ -86,7 +86,7 @@ func NewNetworkdService(configDir, dataDir string) *NetworkdService {
 		// We can still proceed but maybe with empty schemas?
 		sService = &SchemaService{Schemas: make(map[string]map[string]interface{}), TypeCache: make(map[string]map[string]map[string]TypeInfo)}
 	} else {
-		fmt.Printf("Initialized SchemaService with version %s\n", sService.SystemdVersion)
+		fmt.Printf("Initialized SchemaService: Systemd=%s, Schema=%s\n", sService.RealVersion, sService.LoadedVersion)
 	}
 
 	localConnector := NewLocalConnector(configDir, conn)
@@ -397,7 +397,7 @@ func (s *NetworkdService) GetSystemdVersion(host string) (string, error) {
 	}
 	// Fallback for local if connector returns empty (LocalConnector currently does)
 	if host == "" || host == "local" {
-		return s.Schema.SystemdVersion, nil
+		return s.Schema.RealVersion, nil
 	}
 	return "unknown", nil
 }

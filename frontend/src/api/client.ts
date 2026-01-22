@@ -68,6 +68,7 @@ export interface InterfaceFile {
 // System Status Response
 export interface SystemStatus {
     systemd_version: string;
+    schema_version?: string;
     interfaces: Link[];
 }
 

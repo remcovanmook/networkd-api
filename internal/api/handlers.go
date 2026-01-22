@@ -183,8 +183,12 @@ func (h *Handler) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
 	version, _ := h.Service.GetSystemdVersion(host)
 	// fallback handled in Service
 
+	// Resolve the best matching schema version for this host version
+	schemaVersion := h.Service.Schema.ResolveSchemaVersion(version)
+
 	status := map[string]interface{}{
 		"systemd_version": version,
+		"schema_version":  schemaVersion,
 		"interfaces":      links,
 	}
 

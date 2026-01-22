@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -18,36 +20,83 @@ type TypeInfo struct {
 }
 
 type SchemaService struct {
-	SchemaDir      string
-	SystemdVersion string
-	Schemas        map[string]map[string]interface{}
+	SchemaDir         string
+	RealVersion       string // The detected version (e.g., "257")
+	LoadedVersion     string // The schema version used (e.g., "v257")
+	AvailableVersions []int
+	Schemas           map[string]map[string]interface{}
 	// Cache for type info: Section -> Key -> TypeInfo
 	TypeCache map[string]map[string]map[string]TypeInfo
 }
 
 func NewSchemaService(baseSchemaDir string) (*SchemaService, error) {
-	// 1. Detect Version
-	version := "v257" // Default fallback
+	// 1. Detect Real Version
+	realVersionStr := "257" // Default fallback
 	cmd := exec.Command("networkctl", "--version")
 	out, err := cmd.Output()
 	if err == nil {
-		// Output format: "systemd 257 (257)"
+		// Output format: "systemd 257 (257)" or "systemd 261-rc1"
 		re := regexp.MustCompile(`systemd (\d+)`)
 		matches := re.FindStringSubmatch(string(out))
 		if len(matches) > 1 {
-			version = "v" + matches[1]
+			realVersionStr = matches[1]
 		}
 	} else {
-		fmt.Println("networkctl not found or failed, defaulting to", version)
+		// Attempt fallback if networkctl fails? Or just log
+		fmt.Println("networkctl checks failed, defaulting to", realVersionStr)
 	}
 
-	// 2. Load Schemas
-	s := &SchemaService{
-		SchemaDir:      filepath.Join(baseSchemaDir, version),
-		SystemdVersion: version,
-		Schemas:        make(map[string]map[string]interface{}),
-		TypeCache:      make(map[string]map[string]map[string]TypeInfo),
+	realVersion, _ := strconv.Atoi(realVersionStr)
+
+	// 2. Discover Available Schemas
+	availableVersions := []int{}
+	entries, err := os.ReadDir(baseSchemaDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() && strings.HasPrefix(entry.Name(), "v") {
+				if v, err := strconv.Atoi(strings.TrimPrefix(entry.Name(), "v")); err == nil {
+					availableVersions = append(availableVersions, v)
+				}
+			}
+		}
 	}
+	sort.Ints(availableVersions)
+
+	// 3. Select Schema Version
+	selectedVersion := 257 // Default if no schemas found
+	if len(availableVersions) > 0 {
+		if realVersion < availableVersions[0] {
+			// Version < Min -> Use Min
+			selectedVersion = availableVersions[0]
+		} else if realVersion > availableVersions[len(availableVersions)-1] {
+			// Version > Max -> Use Max
+			selectedVersion = availableVersions[len(availableVersions)-1]
+		} else {
+			// In between: Use exact match or highest version <= realVersion
+			// Since we sorted, we iterate to find it.
+			// Finding highest v such that v <= realVersion
+			for _, v := range availableVersions {
+				if v <= realVersion {
+					selectedVersion = v
+				} else {
+					break
+				}
+			}
+		}
+	}
+
+	selectedVersionStr := fmt.Sprintf("v%d", selectedVersion)
+
+	s := &SchemaService{
+		SchemaDir:         filepath.Join(baseSchemaDir, selectedVersionStr),
+		RealVersion:       realVersionStr,
+		LoadedVersion:     selectedVersionStr,
+		AvailableVersions: availableVersions,
+		Schemas:           make(map[string]map[string]interface{}),
+		TypeCache:         make(map[string]map[string]map[string]TypeInfo),
+	}
+
+	fmt.Printf("Systemd Version: %s, Selected Schema: %s\n", realVersionStr, selectedVersionStr)
 
 	files := []string{"systemd.network.schema.json", "systemd.netdev.schema.json", "systemd.link.schema.json"}
 	for _, file := range files {
@@ -204,6 +253,42 @@ func (s *SchemaService) Validate(configType string, data map[string]interface{})
 	}
 
 	return nil
+}
+
+func (s *SchemaService) ResolveSchemaVersion(targetVersionStr string) string {
+	// Parse target version (handle Suffixes e.g. "257-rc2" -> 257)
+	re := regexp.MustCompile(`^v?(\d+)`)
+	matches := re.FindStringSubmatch(targetVersionStr)
+	targetVersion := 257 // Default if parse fails
+	if len(matches) > 1 {
+		if v, err := strconv.Atoi(matches[1]); err == nil {
+			targetVersion = v
+		}
+	}
+
+	if len(s.AvailableVersions) == 0 {
+		return "v257" // Fallback
+	}
+
+	// 1. Version < Min -> Use Min
+	if targetVersion < s.AvailableVersions[0] {
+		return fmt.Sprintf("v%d", s.AvailableVersions[0])
+	}
+	// 2. Version > Max -> Use Max
+	if targetVersion > s.AvailableVersions[len(s.AvailableVersions)-1] {
+		return fmt.Sprintf("v%d", s.AvailableVersions[len(s.AvailableVersions)-1])
+	}
+
+	// 3. In between: Find highest version <= targetVersion
+	selected := s.AvailableVersions[0]
+	for _, v := range s.AvailableVersions {
+		if v <= targetVersion {
+			selected = v
+		} else {
+			break
+		}
+	}
+	return fmt.Sprintf("v%d", selected)
 }
 
 func (s *SchemaService) GetTypeInfo(configType, section, key string) TypeInfo {
