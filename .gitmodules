@@ -1,0 +1,3 @@
+[submodule "deps/networkd-schema"]
+	path = deps/networkd-schema
+	url = https://github.com/remcovanmook/networkd-schema.git
