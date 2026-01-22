@@ -6,7 +6,7 @@ import (
 )
 
 func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
-	content, err := h.Service.GetGlobalConfig()
+	content, err := h.Service.GetGlobalConfig(getHost(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -25,7 +25,7 @@ func (h *Handler) SaveGlobalConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Service.SaveGlobalConfig(body.Content); err != nil {
+	if err := h.Service.SaveGlobalConfig(getHost(r), body.Content); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -33,7 +33,7 @@ func (h *Handler) SaveGlobalConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ReloadNetworkd(w http.ResponseWriter, r *http.Request) {
-	out, err := h.Service.ReloadNetworkd()
+	out, err := h.Service.ReloadNetworkd(getHost(r))
 	if err != nil {
 		// 500 but return output
 		w.WriteHeader(http.StatusInternalServerError)
@@ -44,12 +44,13 @@ func (h *Handler) ReloadNetworkd(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetRoutes(w http.ResponseWriter, r *http.Request) {
-	routes, err := h.Service.GetRoutes()
+	host := getHost(r)
+	routes, err := h.Service.GetRoutes(host)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	rules, err := h.Service.GetRules()
+	rules, err := h.Service.GetRules(host)
 	if err != nil {
 		// Not fatal, maybe just log or ignore
 		rules = "Failed to fetch rules: " + err.Error()
@@ -62,7 +63,7 @@ func (h *Handler) GetRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetLogs(w http.ResponseWriter, r *http.Request) {
-	logs, err := h.Service.GetLogs()
+	logs, err := h.Service.GetLogs(getHost(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

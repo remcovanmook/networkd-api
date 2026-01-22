@@ -4,17 +4,20 @@ import { apiClient } from '../api/client';
 import { Save, RefreshCw, Terminal, Activity, FileText, Router as RouterIcon } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 
+import { useHost } from '../contexts/HostContext';
+
 type Tab = 'config' | 'routes' | 'logs';
 
 const SystemPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('config');
     const [configContent, setConfigContent] = useState('');
     const { showToast } = useToast();
+    const { currentHost } = useHost();
 
     // --- Queries ---
 
     useQuery({
-        queryKey: ['systemConfig'],
+        queryKey: ['systemConfig', currentHost],
         queryFn: async () => {
             const res = await apiClient.getGlobalConfig();
             setConfigContent(res.content);
@@ -24,13 +27,13 @@ const SystemPage: React.FC = () => {
     });
 
     const { data: routesData, refetch: refetchRoutes } = useQuery({
-        queryKey: ['systemRoutes'],
+        queryKey: ['systemRoutes', currentHost],
         queryFn: apiClient.getRoutes,
         enabled: activeTab === 'routes'
     });
 
     const { data: logsData } = useQuery({
-        queryKey: ['systemLogs'],
+        queryKey: ['systemLogs', currentHost],
         queryFn: apiClient.getLogs,
         enabled: activeTab === 'logs',
         refetchInterval: activeTab === 'logs' ? 5000 : false // Auto-refresh logs every 5s

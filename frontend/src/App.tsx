@@ -1,6 +1,9 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { SchemaProvider } from './contexts/SchemaContext';
+import { ToastProvider } from './components/ToastContext';
+import { HostProvider } from './contexts/HostContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import EditNetwork from './pages/EditNetwork';
@@ -10,7 +13,7 @@ import SystemPage from './pages/SystemPage';
 import ApiDocs from './pages/ApiDocs';
 import SchemaEditor from './pages/SchemaEditor';
 import WelcomePage from './pages/WelcomePage';
-import { ToastProvider } from './components/ToastContext';
+import HostManagementPage from './pages/HostManagementPage';
 
 const queryClient = new QueryClient();
 
@@ -18,35 +21,37 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<WelcomePage />} />
-              <Route path="configuration" element={<Dashboard />} />
+        <HostProvider> {/* Added HostProvider */}
+          <SchemaProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<WelcomePage />} />
+                  <Route path="configuration" element={<Dashboard />} />
 
-              {/* Legacy/Edit Routes */}
-              <Route path="interfaces" element={<Dashboard />} />
-              {/* Specific Editors */}
-              <Route path="link/new" element={<EditLink />} />
-              <Route path="link/:filename" element={<EditLink />} />
+                  {/* Specific Editors */}
+                  <Route path="link/new" element={<EditLink />} />
+                  <Route path="link/:filename" element={<EditLink />} />
 
-              <Route path="netdev/new" element={<EditNetDev />} />
-              <Route path="netdev/:filename" element={<EditNetDev />} />
+                  <Route path="netdev/new" element={<EditNetDev />} />
+                  <Route path="netdev/:filename" element={<EditNetDev />} />
 
-              <Route path="network/new" element={<EditNetwork />} />
-              <Route path="network/:filename" element={<EditNetwork />} />
-              {/* Fallback legacy route for now, maybe redirect? */}
-              <Route path="interfaces/:filename" element={<EditNetwork />} />
+                  <Route path="network/new" element={<EditNetwork />} />
+                  <Route path="network/:filename" element={<EditNetwork />} />
 
-              <Route path="system" element={<SystemPage />} />
-              <Route path="preferences" element={<SchemaEditor />} />
-              <Route path="api-docs" element={<ApiDocs />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
+                  <Route path="system" element={<SystemPage />} />
+                  <Route path="hosts" element={<HostManagementPage />} />
+                  <Route path="preferences" element={<SchemaEditor />} />
+                  <Route path="api-docs" element={<ApiDocs />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </SchemaProvider>
+        </HostProvider> {/* Closed HostProvider */}
       </ToastProvider>
     </QueryClientProvider>
   );
 };
 
 export default App;
+

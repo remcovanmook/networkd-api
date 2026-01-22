@@ -1,5 +1,5 @@
 
-import { type ConfigOption } from '../pages/schema';
+import { type ConfigOption } from './schemaProcessor';
 
 // Helper to check if a value is "empty"
 const isEmpty = (value: any): boolean => {

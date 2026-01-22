@@ -1,11 +1,14 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { ConfirmModal } from '../components/ConfirmModal';
+import { useToast } from '../components/ToastContext';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 
-import { FileText, Activity, ArrowRight, Network as NetworkIcon, Sliders } from 'lucide-react';
+import { Activity, ArrowRight, Network as NetworkIcon, Sliders, Trash2, RefreshCw, Zap, Plus, Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
+    const { showToast } = useToast();
     // 1. Virtual Devices (.netdev) - Definitions
     const { data: netdevs } = useQuery({
         queryKey: ['netdevs'],
@@ -13,10 +16,11 @@ const Dashboard: React.FC = () => {
     });
 
     // 2. System Interfaces (Runtime Links) - Active State
-    const { data: links } = useQuery({
-        queryKey: ['interfaces'],
-        queryFn: apiClient.getInterfaces
+    const { data: systemStatus } = useQuery({
+        queryKey: ['systemStatus'],
+        queryFn: apiClient.getSystemStatus
     });
+    const links = systemStatus?.interfaces;
 
     // 3. Network Profiles (.network) - Configurations
     const { data: configs } = useQuery({
@@ -30,6 +34,64 @@ const Dashboard: React.FC = () => {
         queryFn: apiClient.getLinkConfigs
     });
 
+    const queryClient = useQueryClient();
+
+    const deleteNetDev = useMutation({
+        mutationFn: apiClient.deleteNetDev,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['netdevs'] })
+    });
+
+    const deleteNetwork = useMutation({
+        mutationFn: apiClient.deleteNetwork,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['networks'] })
+    });
+
+    const deleteLink = useMutation({
+        mutationFn: apiClient.deleteLink,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['links'] });
+            queryClient.invalidateQueries({ queryKey: ['systemStatus'] });
+        }
+    });
+
+
+
+    const reloadMutation = useMutation({
+        mutationFn: apiClient.reloadNetworkd,
+        onSuccess: () => {
+            showToast('Networkd reloaded successfully', 'success');
+            queryClient.invalidateQueries();
+        }
+    });
+
+    const reconfigureMutation = useMutation({
+        mutationFn: (interfaces: string[] = []) => apiClient.reconfigure(interfaces),
+        onSuccess: (_, variables) => {
+            const msg = variables && variables.length > 0
+                ? `Reconfigured ${variables.join(', ')} successfully`
+                : 'Networkd reconfigured successfully';
+            showToast(msg, 'success');
+            queryClient.invalidateQueries();
+        }
+    });
+
+    const [deleteTarget, setDeleteTarget] = useState<{ type: 'netdev' | 'network' | 'link'; filename: string } | null>(null);
+
+    const handleDeleteClick = (type: 'netdev' | 'network' | 'link', filename: string) => {
+        setDeleteTarget({ type, filename });
+    };
+
+    const handleConfirmDelete = () => {
+        if (!deleteTarget) return;
+
+        const { type, filename } = deleteTarget;
+        if (type === 'netdev') deleteNetDev.mutate(filename);
+        if (type === 'network') deleteNetwork.mutate(filename);
+        if (type === 'link') deleteLink.mutate(filename);
+
+        setDeleteTarget(null);
+    };
+
     return (
         <div style={{ paddingBottom: '4rem' }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -37,24 +99,20 @@ const Dashboard: React.FC = () => {
                     Configuration
                 </h1>
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                    <Link to="/link/new">
-                        <button style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '0.6rem 1.2rem', borderRadius: '6px', cursor: 'pointer' }}>
-                            <FileText size={18} />
-                            Add .link
-                        </button>
-                    </Link>
-                    <Link to="/netdev/new">
-                        <button style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--accent-secondary)', color: 'white', padding: '0.6rem 1.2rem', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
-                            <Activity size={18} />
-                            Add NetDev
-                        </button>
-                    </Link>
-                    <Link to="/network/new">
-                        <button style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--accent-primary)', color: 'white', padding: '0.6rem 1.2rem', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
-                            <NetworkIcon size={18} />
-                            Add Network
-                        </button>
-                    </Link>
+                    <button
+                        onClick={() => reconfigureMutation.mutate([])}
+                        title="Is applies the configuration without restarting networkd, but acts on all interfaces."
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '0.6rem 1.2rem', borderRadius: '6px', cursor: 'pointer' }}>
+                        <Zap size={18} />
+                        Reconfigure
+                    </button>
+                    <button
+                        onClick={() => reloadMutation.mutate()}
+                        title="Reloads .network and .netdev files. Does not apply changes to existing links."
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '0.6rem 1.2rem', borderRadius: '6px', cursor: 'pointer' }}>
+                        <RefreshCw size={18} />
+                        Reload
+                    </button>
                 </div>
             </header>
 
@@ -86,25 +144,42 @@ const Dashboard: React.FC = () => {
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <h3 style={{ margin: 0 }}>{link.name}</h3>
-                                        <Link
-                                            to={activeConfig
-                                                ? `/link/${activeConfig.filename}`
-                                                : `/link/new?match=${link.name}`
-                                            }
-                                            title={activeConfig ? "Edit Configuration" : "Create Configuration"}
-                                        >
-                                            <button style={{
-                                                padding: '0.4rem 0.8rem',
-                                                background: activeConfig ? 'var(--bg-tertiary)' : 'var(--accent-primary)',
-                                                border: '1px solid var(--border-color)',
-                                                borderRadius: '6px',
-                                                cursor: 'pointer',
-                                                color: activeConfig ? 'var(--text-primary)' : 'white',
-                                                display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem'
-                                            }}>
-                                                <Sliders size={16} /> {activeConfig ? 'Configure' : 'Configure'}
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <Link
+                                                to={activeConfig
+                                                    ? `/link/${activeConfig.filename}`
+                                                    : `/link/new?match=${link.name}`
+                                                }
+                                                title={activeConfig ? "Edit Configuration" : "Create Configuration"}
+                                            >
+                                                <button style={{
+                                                    padding: '0.4rem',
+                                                    background: activeConfig ? 'var(--bg-tertiary)' : 'var(--accent-primary)',
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    color: activeConfig ? 'var(--text-primary)' : 'white',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}>
+                                                    <Sliders size={16} />
+                                                </button>
+                                            </Link>
+                                            <button
+                                                onClick={() => reconfigureMutation.mutate([link.name])}
+                                                title={`Reconfigure ${link.name} only`}
+                                                style={{
+                                                    padding: '0.4rem',
+                                                    background: 'transparent',
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    color: 'var(--text-primary)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}
+                                            >
+                                                <Zap size={16} />
                                             </button>
-                                        </Link>
+                                        </div>
                                     </div>
                                     <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                                         <span style={{
@@ -142,20 +217,45 @@ const Dashboard: React.FC = () => {
                                     <div style={{ fontWeight: 'bold' }}>{file.filename}</div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>.link config</div>
                                 </div>
-                                <Link to={`/link/${file.filename}`}>
-                                    <button style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>
-                                        <ArrowRight size={14} />
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        onClick={() => handleDeleteClick('link', file.filename)}
+                                        style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: 0.6 }}
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={14} />
                                     </button>
-                                </Link>
+                                    <Link to={`/link/${file.filename}`}>
+                                        <button style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>
+                                            <ArrowRight size={14} />
+                                        </button>
+                                    </Link>
+                                </div>
                             </div>
                         ))}
+
+                        <Link to="/link/new" style={{ textDecoration: 'none' }}>
+                            <button style={{
+                                width: '100%',
+                                padding: '0.8rem',
+                                border: '1px dashed var(--border-color)',
+                                background: 'transparent',
+                                color: 'var(--text-secondary)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem',
+                                fontSize: '0.9rem'
+                            }}>
+                                <Plus size={16} /> Add .link Configuration
+                            </button>
+                        </Link>
                     </div>
                 </div>
 
                 {/* Column 2: Virtual Devices */}
                 <div>
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '2px solid var(--accent-secondary)', paddingBottom: '0.5rem' }}>
-                        <Activity color="var(--accent-secondary)" />
+                        <Layers color="var(--accent-secondary)" />
                         Virtual Devices
                     </h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
@@ -177,13 +277,38 @@ const Dashboard: React.FC = () => {
                                         <span style={{ marginLeft: '0.5rem' }}>{file.filename}</span>
                                     </div>
                                 </div>
-                                <Link to={`/netdev/${file.filename}`}>
-                                    <button style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>
-                                        <ArrowRight size={14} />
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        onClick={() => handleDeleteClick('netdev', file.filename)}
+                                        style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: 0.6 }}
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={14} />
                                     </button>
-                                </Link>
+                                    <Link to={`/netdev/${file.filename}`}>
+                                        <button style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>
+                                            <ArrowRight size={14} />
+                                        </button>
+                                    </Link>
+                                </div>
                             </div>
                         ))}
+
+                        <Link to="/netdev/new" style={{ textDecoration: 'none' }}>
+                            <button style={{
+                                width: '100%',
+                                padding: '0.8rem',
+                                border: '1px dashed var(--accent-secondary)',
+                                background: 'rgba(59, 130, 246, 0.05)',
+                                color: 'var(--accent-secondary)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem',
+                                fontSize: '0.9rem'
+                            }}>
+                                <Plus size={16} /> Add Virtual Device
+                            </button>
+                        </Link>
                     </div>
                 </div>
 
@@ -211,17 +336,53 @@ const Dashboard: React.FC = () => {
                                     </div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{file.filename}</div>
                                 </div>
-                                <Link to={`/network/${file.filename}`}>
-                                    <button style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>
-                                        <ArrowRight size={14} />
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        onClick={() => handleDeleteClick('network', file.filename)}
+                                        style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: 0.6 }}
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={14} />
                                     </button>
-                                </Link>
+                                    <Link to={`/network/${file.filename}`}>
+                                        <button style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>
+                                            <ArrowRight size={14} />
+                                        </button>
+                                    </Link>
+                                </div>
                             </div>
                         ))}
+
+                        <Link to="/network/new" style={{ textDecoration: 'none' }}>
+                            <button style={{
+                                width: '100%',
+                                padding: '0.8rem',
+                                border: '1px dashed var(--accent-primary)',
+                                background: 'rgba(16, 185, 129, 0.05)',
+                                color: 'var(--accent-primary)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem',
+                                fontSize: '0.9rem'
+                            }}>
+                                <Plus size={16} /> Add Network
+                            </button>
+                        </Link>
                     </div>
                 </div>
 
             </div>
+
+            <ConfirmModal
+                isOpen={!!deleteTarget}
+                title="Delete Configuration"
+                message={`Are you sure you want to delete ${deleteTarget?.filename}? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                isDangerous={true}
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setDeleteTarget(null)}
+            />
         </div>
     );
 };

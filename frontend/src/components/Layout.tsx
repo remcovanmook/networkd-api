@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Network, Settings, FileCode, Sliders } from 'lucide-react';
+import { HostSelector } from './HostSelector';
 
 const Layout: React.FC = () => {
     const location = useLocation();
@@ -26,6 +27,9 @@ const Layout: React.FC = () => {
                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <Network color="var(--accent-primary)" />
                     <span>NetConfig</span>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                    <HostSelector />
                 </div>
                 <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {navItems.map((item) => {

@@ -3,21 +3,11 @@ import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { ArrowLeft, Trash2, ExternalLink, ChevronDown, ChevronRight, Save } from 'lucide-react';
-import { LINK_SECTIONS, type ConfigOption } from './schema';
 import { useViewConfig } from '../hooks/useViewConfig';
 import { useToast } from '../components/ToastContext';
 import { ConfigField } from '../components/ConfigField';
 import { LivePreview } from '../components/LivePreview';
-
-interface SectionDef {
-    name: string;
-    label?: string;
-    description?: string;
-    docUrl?: string;
-    multiple?: boolean;
-    options: ConfigOption[];
-}
-const typedLinkSections = LINK_SECTIONS as unknown as Record<string, SectionDef>;
+import { useSchema } from '../contexts/SchemaContext';
 
 const EditLink: React.FC = () => {
     const navigate = useNavigate();
@@ -25,6 +15,7 @@ const EditLink: React.FC = () => {
     const [searchParams] = useSearchParams();
     const queryClient = useQueryClient();
     const { showToast } = useToast();
+    const { linkSections, loading: schemaLoading } = useSchema();
 
     // Load View Config
     const { data: viewConfig } = useViewConfig();
@@ -41,6 +32,12 @@ const EditLink: React.FC = () => {
     const [config, setConfig] = useState<any>({
         Match: { OriginalName: searchParams.get('match') || '' }
     });
+
+    // Ensure schema is loaded
+    if (schemaLoading || !linkSections) {
+        return <div style={{ padding: '2rem' }}>Loading schema configuration...</div>;
+    }
+    const typedLinkSections = linkSections;
 
     // Determine config to use (LINK only)
     const viewConfigLookup = useMemo(() => {
@@ -159,7 +156,7 @@ const EditLink: React.FC = () => {
             await queryClient.invalidateQueries({ queryKey: ['links'] });
             await queryClient.invalidateQueries({ queryKey: ['interfaces'] }); // refresh list
             showToast('Link configuration saved', 'success');
-            navigate('/interfaces');
+            navigate('/configuration');
         },
         onError: (err: any) => showToast(`Failed: ${err.message}`, 'error')
     });
@@ -170,7 +167,7 @@ const EditLink: React.FC = () => {
             await queryClient.invalidateQueries({ queryKey: ['links'] });
             await queryClient.invalidateQueries({ queryKey: ['interfaces'] });
             showToast('Link deleted', 'success');
-            navigate('/interfaces');
+            navigate('/configuration');
         }
     });
 
@@ -199,7 +196,7 @@ const EditLink: React.FC = () => {
             }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <Link to="/interfaces"><button style={{ padding: '0.5rem', display: 'flex', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}><ArrowLeft /></button></Link>
+                        <Link to="/configuration"><button style={{ padding: '0.5rem', display: 'flex', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}><ArrowLeft /></button></Link>
                         <h1>{paramFilename ? 'Edit Link' : 'New Link'}</h1>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem' }}>

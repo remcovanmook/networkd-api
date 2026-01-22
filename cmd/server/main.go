@@ -10,10 +10,12 @@ import (
 
 func main() {
 	configDir := os.Getenv("NETWORKD_CONFIG_DIR")
+	dataDir := os.Getenv("NETWORKD_DATA_DIR")
 	staticDir := os.Getenv("STATIC_DIR")
 
-	svc := service.NewNetworkdService(configDir)
+	svc := service.NewNetworkdService(configDir, dataDir)
 	log.Printf("Using ConfigDir: %s", svc.ConfigDir)
+	log.Printf("Using DataDir: %s", svc.DataDir)
 	h := api.NewHandler(svc)
 	r := api.NewRouter(h, staticDir)
 

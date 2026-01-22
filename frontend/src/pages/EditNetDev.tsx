@@ -1,24 +1,13 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { ArrowLeft, Trash2, ExternalLink, ChevronDown, ChevronRight, Save, Layers, Check, ArrowRight, Plus } from 'lucide-react';
-import { NETDEV_SECTIONS, NETDEV_KINDS, COMMON_NETDEV_KINDS, type ConfigOption } from './schema';
 import { useViewConfig } from '../hooks/useViewConfig';
 import { useToast } from '../components/ToastContext';
 import { ConfigField } from '../components/ConfigField';
 import { LivePreview } from '../components/LivePreview';
-
-interface SectionDef {
-    name: string;
-    label?: string;
-    description?: string;
-    docUrl?: string;
-    multiple?: boolean;
-    options: ConfigOption[];
-}
-const typedNetdevSections = NETDEV_SECTIONS as unknown as Record<string, SectionDef>;
+import { useSchema } from '../contexts/SchemaContext';
 
 type WizardStep = 'kind-selection' | 'essential-config' | 'full-editor';
 
@@ -27,6 +16,7 @@ const EditNetDev: React.FC = () => {
     const { filename: paramFilename } = useParams();
     const queryClient = useQueryClient();
     const { showToast } = useToast();
+    const { netdevSections, netdevKinds, commonNetDevKinds, loading: schemaLoading } = useSchema();
 
     // Load View Config
     const { data: viewConfig } = useViewConfig();
@@ -43,6 +33,12 @@ const EditNetDev: React.FC = () => {
     const [config, setConfig] = useState<any>({ NetDev: { Kind: 'bridge' } });
     const [netdevKind, setNetdevKind] = useState('bridge');
     const [manualNameOverride, setManualNameOverride] = useState('');
+
+    // Ensure schema is loaded
+    if (schemaLoading || !netdevSections) {
+        return <div style={{ padding: '2rem' }}>Loading schema configuration...</div>;
+    }
+    const typedNetdevSections = netdevSections;
 
     // Determine config to use (NETDEV only)
     const viewConfigLookup = useMemo(() => {
@@ -130,7 +126,7 @@ const EditNetDev: React.FC = () => {
         const usedTabs = new Set<string>();
 
         // Filter available tabs based on Kind (NetDev + KindSpecific)
-        const kindSpecific = NETDEV_KINDS[netdevKind] || [];
+        const kindSpecific = netdevKinds[netdevKind] || [];
         const availableTabs = Object.keys(typedNetdevSections).filter(t => t === 'NetDev' || kindSpecific.includes(t));
 
         viewConfig.netdev.forEach(cat => {
@@ -149,7 +145,7 @@ const EditNetDev: React.FC = () => {
         if (orphanTabs.length > 0) result.push({ category: 'Advanced', tabs: orphanTabs });
 
         return result;
-    }, [viewConfig, netdevKind]);
+    }, [viewConfig, netdevKind, netdevKinds, typedNetdevSections]);
 
 
     const updateConfig = (section: string, field: string, value: any, index?: number) => {
@@ -178,7 +174,7 @@ const EditNetDev: React.FC = () => {
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['netdevs'] });
             showToast('Device configuration saved', 'success');
-            navigate('/interfaces');
+            navigate('/configuration');
         },
         onError: (err: any) => showToast(`Failed: ${err.message} `, 'error')
     });
@@ -188,7 +184,7 @@ const EditNetDev: React.FC = () => {
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['netdevs'] });
             showToast('Device configuration deleted', 'success');
-            navigate('/interfaces');
+            navigate('/configuration');
         }
     });
 
@@ -210,13 +206,13 @@ const EditNetDev: React.FC = () => {
 
     // WIZARD VIEW
     if (!paramFilename && wizardStep !== 'full-editor') {
-        const kindsToShow = showAdvancedKinds ? Object.keys(NETDEV_KINDS) : COMMON_NETDEV_KINDS;
+        const kindsToShow = showAdvancedKinds ? Object.keys(netdevKinds) : commonNetDevKinds;
 
         if (wizardStep === 'kind-selection') {
             return (
                 <div style={{ maxWidth: '800px', margin: '0 auto' }}>
                     <header style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
-                        <button onClick={() => navigate('/interfaces')} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: '1rem' }}><ArrowLeft /></button>
+                        <button onClick={() => navigate('/configuration')} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: '1rem' }}><ArrowLeft /></button>
                         <h1>Create Virtual Device: Step 1</h1>
                     </header>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem' }}>
@@ -232,7 +228,7 @@ const EditNetDev: React.FC = () => {
                                 style={{
                                     padding: '2rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer',
                                     fontSize: '1.2rem', fontWeight: 'bold', textTransform: 'uppercase', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
-                                    opacity: (NETDEV_KINDS[k].includes('NetDev') && !COMMON_NETDEV_KINDS.includes(k)) ? 0.8 : 1
+                                    opacity: (netdevKinds[k].includes('NetDev') && !commonNetDevKinds.includes(k)) ? 0.8 : 1
                                 }}
                             >
                                 <Layers size={32} />
@@ -250,7 +246,7 @@ const EditNetDev: React.FC = () => {
         }
 
         if (wizardStep === 'essential-config') {
-            const kindDef = NETDEV_KINDS[netdevKind];
+            const kindDef = netdevKinds[netdevKind];
             const specificSectionKey = kindDef?.find(k => k !== 'NetDev');
 
             return (
@@ -327,7 +323,7 @@ const EditNetDev: React.FC = () => {
             }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <Link to="/interfaces"><button style={{ padding: '0.5rem', display: 'flex', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}><ArrowLeft /></button></Link>
+                        <Link to="/configuration"><button style={{ padding: '0.5rem', display: 'flex', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}><ArrowLeft /></button></Link>
                         <h1>{paramFilename ? 'Edit Virtual Device' : `Create ${netdevKind.toUpperCase()} `}</h1>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem' }}>

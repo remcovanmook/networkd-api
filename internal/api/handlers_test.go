@@ -11,77 +11,158 @@ import (
 	"testing"
 )
 
-func TestHandlers(t *testing.T) {
-	// Setup temp dir for config
+func setupTestService(t *testing.T) (*service.NetworkdService, string) {
 	tmpDir, err := os.MkdirTemp("", "networkd-test")
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	// Reuse tmpDir as DataDir for simplicity in tests, or create separate
+	svc := service.NewNetworkdService(tmpDir, tmpDir)
+
+	// Manually inject dummy schemas
+	if svc.Schema == nil {
+		svc.Schema = &service.SchemaService{
+			Schemas:   make(map[string]map[string]interface{}),
+			TypeCache: make(map[string]map[string]map[string]service.TypeInfo),
+		}
+	}
+
+	svc.Schema.Schemas["network"] = map[string]interface{}{
+		"properties": map[string]interface{}{
+			"Match": map[string]interface{}{
+				"properties": map[string]interface{}{"Name": map[string]interface{}{"type": "string"}},
+			},
+			"Network": map[string]interface{}{
+				"properties": map[string]interface{}{"DHCP": map[string]interface{}{"type": "string", "enum": []interface{}{"yes", "no", "ipv4", "ipv6"}}},
+			},
+		},
+	}
+	// Simplified cache
+	svc.Schema.TypeCache["network"] = map[string]map[string]service.TypeInfo{
+		"Match":   {"Name": {}},
+		"Network": {"DHCP": {}},
+	}
+
+	return svc, tmpDir
+}
+
+func TestListConfigs(t *testing.T) {
+	svc, tmpDir := setupTestService(t)
 	defer os.RemoveAll(tmpDir)
 
-	svc := service.NewNetworkdService(tmpDir)
-	h := NewHandler(svc)
-	router := NewRouter(h, "")
+	// Create a dummy network file
+	content := "[Match]\nName=eth0\n[Network]\nDHCP=yes\n"
+	os.WriteFile(filepath.Join(tmpDir, "eth0.network"), []byte(content), 0644)
 
-	// Test 1: List Interfaces (Empty)
-	req := httptest.NewRequest("GET", "/api/interfaces", nil)
+	handler := NewHandler(svc)
+	req := httptest.NewRequest("GET", "/api/networks", nil)
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected 200 OK, got %d", w.Code)
+	handler.ListNetworks(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK, got %d", resp.StatusCode)
 	}
 
-	// Test 2: Create Network
-	config := service.NetworkConfig{
-		Match: service.MatchSection{
-			Name: []string{"eth0"},
+	var files []service.FileInfo
+	json.NewDecoder(resp.Body).Decode(&files)
+	if len(files) != 1 {
+		t.Errorf("Expected 1 file, got %d", len(files))
+	}
+	if files[0].Filename != "eth0.network" {
+		t.Errorf("Expected filename 'eth0.network', got %s", files[0].Filename)
+	}
+}
+
+func TestCreateNetwork(t *testing.T) {
+	svc, tmpDir := setupTestService(t)
+	defer os.RemoveAll(tmpDir)
+
+	handler := NewHandler(svc)
+
+	reqBody := map[string]interface{}{
+		"filename": "test.network",
+		"config": map[string]interface{}{
+			"Match": map[string]interface{}{
+				"Name": "test0",
+			},
+			"Network": map[string]interface{}{
+				"DHCP": "yes",
+			},
 		},
-		Network: service.NetworkSection{DHCP: "yes"},
 	}
 
-	payload := map[string]interface{}{
-		"filename": "10-eth0.network",
-		"config":   config,
-	}
-	body, _ := json.Marshal(payload)
-	req = httptest.NewRequest("POST", "/api/networks", bytes.NewBuffer(body))
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest("POST", "/api/networks", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	w := httptest.NewRecorder()
 
-	if w.Code != http.StatusCreated {
-		t.Errorf("Expected 201 Created, got %d", w.Code)
+	handler.CreateNetwork(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Expected 201 Created, got %d", resp.StatusCode)
 	}
 
-	// Verify file created
-	content, err := os.ReadFile(filepath.Join(tmpDir, "10-eth0.network"))
+	content, err := os.ReadFile(filepath.Join(tmpDir, "test.network"))
 	if err != nil {
-		t.Errorf("File not created: %v", err)
-	}
-	if err != nil {
-		t.Errorf("File not created: %v", err)
+		t.Fatalf("File not created: %v", err)
 	}
 
-	// Since we generating via INI lib, whitespace might differ slightly, but key content should be there.
-	// Or we can parse it back.
-	if !bytes.Contains(content, []byte("Name = eth0")) {
-		t.Errorf("Content missing Name=eth0: %s", content)
+	sContent := string(content)
+	// Check loosely because parsing/generating might reorder or format
+	// Actually MapToINI sorts keys so it's deterministic
+	// But whitespace (spaces around =) depends on library default.
+	if !contains(sContent, "Name") || !contains(sContent, "test0") || !contains(sContent, "DHCP") || !contains(sContent, "yes") {
+		t.Errorf("Content mismatch: %s", sContent)
 	}
-	if !bytes.Contains(content, []byte("DHCP = yes")) { // ini lib usually checks spaces
-		t.Errorf("Content missing DHCP=yes: %s", content)
+}
+
+func contains(s, substr string) bool {
+	// Basic impl or use strings.Contains
+	for i := 0; i < len(s)-len(substr)+1; i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func TestHostManagement(t *testing.T) {
+	svc, tmpDir := setupTestService(t)
+	defer os.RemoveAll(tmpDir)
+
+	handler := NewHandler(svc)
+	w := httptest.NewRecorder()
+
+	// Add Host
+	hostBody := map[string]interface{}{
+		"name": "node1",
+		"host": "192.168.1.10",
+	}
+	body, _ := json.Marshal(hostBody)
+	req := httptest.NewRequest("POST", "/api/system/hosts", bytes.NewBuffer(body))
+	handler.AddHost(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("AddHost failed: %d", resp.StatusCode)
 	}
 
-	// Test 3: List Interfaces (Populated)
-	req = httptest.NewRequest("GET", "/api/interfaces", nil)
+	// List Hosts
 	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	req = httptest.NewRequest("GET", "/api/system/hosts", nil)
+	handler.ListHosts(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected 200 OK, got %d", w.Code)
+	resp = w.Result()
+	var hosts []service.HostConfig
+	if err := json.NewDecoder(resp.Body).Decode(&hosts); err != nil {
+		t.Fatal(err)
 	}
-	// Verify output contains "10-eth0.network"
-	if !bytes.Contains(w.Body.Bytes(), []byte("10-eth0.network")) {
-		t.Errorf("Response did not contain filename: %s", w.Body.String())
+	if len(hosts) != 1 || hosts[0].Name != "node1" {
+		t.Errorf("ListHosts failed, got %v", hosts)
 	}
 }

@@ -11,10 +11,11 @@ const WelcomePage: React.FC = () => {
     // Using getRoutes to show routing table summary?
     // Using getInterfaces for operational state summary?
 
-    const { data: links } = useQuery({
-        queryKey: ['interfaces'],
-        queryFn: apiClient.getInterfaces
+    const { data: systemStatus } = useQuery({
+        queryKey: ['systemStatus'],
+        queryFn: apiClient.getSystemStatus
     });
+    const links = systemStatus?.interfaces;
 
     const { data: routes } = useQuery({
         queryKey: ['routes'],
@@ -27,7 +28,7 @@ const WelcomePage: React.FC = () => {
     const systemInfo = {
         frontendVersion: '0.1.0',
         backendVersion: '0.1.0', // Placeholder
-        systemdVersion: '257' // As per user context earlier
+        systemdVersion: systemStatus?.systemd_version || 'Loading...'
     };
 
     const activeLinks = links?.filter(l => l.operational_state === 'routable' || l.operational_state === 'degraded').length || 0;

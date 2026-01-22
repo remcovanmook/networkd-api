@@ -1,24 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useViewConfig, useSaveViewConfig, type CategoryViewConfig, type SectionViewConfig, type RootViewConfig } from '../hooks/useViewConfig';
-import { NETWORK_SECTIONS, NETDEV_SECTIONS, LINK_SECTIONS } from './schema';
+import { useSchema } from '../contexts/SchemaContext';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Save, Plus, Trash2, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/ToastContext';
-
-// --- Helper to get all options for a section ---
-const getAllOptions = (sectionName: string): string[] => {
-    const opts = new Set<string>();
-    [NETWORK_SECTIONS, NETDEV_SECTIONS, LINK_SECTIONS].forEach(schema => {
-        const section = (schema as any)[sectionName];
-        if (section && section.options) {
-            section.options.forEach((opt: any) => opts.add(opt.key));
-        }
-    });
-    return Array.from(opts).sort();
-};
 
 // --- Section Editor Component ---
 function SectionEditor({ section, onUpdate, onDelete }: {
@@ -27,9 +15,22 @@ function SectionEditor({ section, onUpdate, onDelete }: {
     onDelete: () => void
 }) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const { networkSections, netdevSections, linkSections } = useSchema();
 
     const visibleFields = section.visible || [];
-    const allAvailable = useMemo(() => getAllOptions(section.name), [section.name]);
+
+    const allAvailable = useMemo(() => {
+        const opts = new Set<string>();
+        [networkSections, netdevSections, linkSections].forEach(schema => {
+            if (!schema) return;
+            const sec = schema[section.name];
+            if (sec && sec.options) {
+                sec.options.forEach((opt: any) => opts.add(opt.key));
+            }
+        });
+        return Array.from(opts).sort();
+    }, [section.name, networkSections, netdevSections, linkSections]);
+
     const unusedFields = useMemo(() => allAvailable.filter(f => !visibleFields.includes(f)), [allAvailable, visibleFields]);
 
     const handleMoveField = (idx: number, direction: 'up' | 'down') => {
@@ -214,6 +215,7 @@ const SchemaEditor: React.FC = () => {
     const saveMutation = useSaveViewConfig();
     const queryClient = useQueryClient();
     const { showToast } = useToast();
+    const { networkSections, netdevSections, linkSections } = useSchema();
 
     // Local State
     const [localConfig, setLocalConfig] = useState<RootViewConfig | null>(null);
@@ -234,15 +236,15 @@ const SchemaEditor: React.FC = () => {
     const allSections = useMemo(() => {
         const sections = new Set<string>();
         let schemas: any[] = [];
-        if (activeType === 'network') schemas = [NETWORK_SECTIONS];
-        else if (activeType === 'netdev') schemas = [NETDEV_SECTIONS];
-        else if (activeType === 'link') schemas = [LINK_SECTIONS];
+        if (activeType === 'network' && networkSections) schemas = [networkSections];
+        else if (activeType === 'netdev' && netdevSections) schemas = [netdevSections];
+        else if (activeType === 'link' && linkSections) schemas = [linkSections];
 
         schemas.forEach(schema => {
             Object.keys(schema as any).forEach(k => sections.add(k));
         });
         return Array.from(sections).sort();
-    }, [activeType]);
+    }, [activeType, networkSections, netdevSections, linkSections]);
 
     // Calculate Unused Sections
     const unusedSections = useMemo(() => {

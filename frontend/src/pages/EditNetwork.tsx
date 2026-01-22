@@ -1,23 +1,14 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { ArrowLeft, Trash2, ExternalLink, ChevronDown, ChevronRight, Save, Plus } from 'lucide-react';
-import { NETWORK_SECTIONS, type ConfigOption } from './schema';
 import { useViewConfig } from '../hooks/useViewConfig';
 import { useToast } from '../components/ToastContext';
 import { ConfigField } from '../components/ConfigField';
 import { LivePreview } from '../components/LivePreview';
-
-interface SectionDef {
-    name: string;
-    label?: string;
-    description?: string;
-    docUrl?: string;
-    multiple?: boolean;
-    options: ConfigOption[];
-}
-const typedNetworkSections = NETWORK_SECTIONS as unknown as Record<string, SectionDef>;
+import { useSchema } from '../contexts/SchemaContext';
 
 const EditNetwork: React.FC = () => {
     const navigate = useNavigate();
@@ -25,6 +16,7 @@ const EditNetwork: React.FC = () => {
     const [searchParams] = useSearchParams();
     const queryClient = useQueryClient();
     const { showToast } = useToast();
+    const { networkSections, loading: schemaLoading } = useSchema();
 
     // Load View Config
     const { data: viewConfig } = useViewConfig();
@@ -40,6 +32,13 @@ const EditNetwork: React.FC = () => {
         Match: { Name: searchParams.get('match') || '' },
         Network: { DHCP: 'yes' }
     });
+
+    // Ensure schema is loaded
+    if (schemaLoading || !networkSections) {
+        return <div style={{ padding: '2rem' }}>Loading schema configuration...</div>;
+    }
+
+    const typedNetworkSections = networkSections;
 
     // Determine config to use (NETWORK only)
     const viewConfigLookup = useMemo(() => {
@@ -109,7 +108,7 @@ const EditNetwork: React.FC = () => {
         if (!paramFilename) {
             const name = config.Match?.Name || '';
             if (name) {
-                setFilename(`10-${name}.network`);
+                setFilename(`10 - ${name}.network`);
             }
         }
     }, [config.Match?.Name, paramFilename]);
@@ -179,7 +178,7 @@ const EditNetwork: React.FC = () => {
             showToast('Network configuration saved', 'success');
             navigate('/configuration');
         },
-        onError: (err: any) => showToast(`Failed: ${err.message}`, 'error')
+        onError: (err: any) => showToast(`Failed: ${err.message} `, 'error')
     });
 
     const deleteMutation = useMutation({

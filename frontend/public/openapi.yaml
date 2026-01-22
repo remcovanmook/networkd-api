@@ -6,103 +6,162 @@ info:
 servers:
   - url: http://localhost:8080
 paths:
-  /api/interfaces:
+  /api/system/status:
     get:
-      summary: List Active Interviews (Runtime)
-      description: Returns a list of all runtime network interfaces (physical and virtual).
+      summary: Get System Status
+      description: Returns system details including detected systemd version and active runtime interfaces.
       responses:
         '200':
-          description: List of runtime links
-  
-  /api/interfaces/netdevs:
+          description: System status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  systemd_version:
+                    type: string
+                  interfaces:
+                    type: array
+                    items:
+                      type: object
+
+  /api/schemas:
     get:
-      summary: List Virtual Device Definitions
+      summary: Get Loaded JSON Schemas
+      description: Returns the raw JSON schemas for networkd configuration files.
+      responses:
+        '200':
+          description: Map of schemas
+
+  /api/netdevs:
+    get:
+      summary: List NetDev Files
       description: Returns a list of all stored `.netdev` files.
       responses:
         '200':
-          description: List of netdev files
-
-  /api/interfaces/{filename}:
-    get:
-      summary: Get NetDev Configuration Content
-      parameters:
-        - name: filename
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Configuration content
-    delete:
-      summary: Delete NetDev Configuration
-      parameters:
-        - name: filename
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Deleted
-
-  /api/networks:
-    get:
-      summary: List Network Configurations
-      description: Returns a list of all stored `.network` files.
-      responses:
-        '200':
-          description: List of network config files
+          description: List of files
     post:
-      summary: Create Network Configuration
+      summary: Create NetDev File
       requestBody:
         content:
           application/json:
             schema:
               type: object
-              required:
-                - filename
-                - config
+              required: [filename, config]
               properties:
-                filename:
-                  type: string
-                config:
-                  type: object
+                filename: {type: string}
+                config: {type: object}
       responses:
-        '201':
-          description: Created
+        '201': {description: Created}
+
+  /api/netdevs/{filename}:
+    get:
+      summary: Get NetDev Content
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Content}
+    delete:
+      summary: Delete NetDev File
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Deleted}
+
+  /api/networks:
+    get:
+      summary: List Network Files
+      description: Returns a list of all stored `.network` files.
+      responses:
+        '200':
+          description: List of files
+    post:
+      summary: Create Network File
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, config]
+              properties:
+                filename: {type: string}
+                config: {type: object}
+      responses:
+        '201': {description: Created}
 
   /api/networks/{filename}:
     get:
-      summary: Get Network Configuration Content
+      summary: Get Network Content
       parameters:
         - name: filename
           in: path
           required: true
-          schema:
-            type: string
+          schema: {type: string}
+      responses:
+        '200': {description: Content}
+    delete:
+      summary: Delete Network File
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Deleted}
+
+  /api/links:
+    get:
+      summary: List Link Files
+      description: Returns a list of all stored `.link` files.
       responses:
         '200':
-          description: Configuration content
-    delete:
-      summary: Delete Network Configuration
+          description: List of files
+    post:
+      summary: Create Link File
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, config]
+              properties:
+                filename: {type: string}
+                config: {type: object}
+      responses:
+        '201': {description: Created}
+
+  /api/links/{filename}:
+    get:
+      summary: Get Link Content
       parameters:
         - name: filename
           in: path
           required: true
-          schema:
-            type: string
+          schema: {type: string}
       responses:
-        '204':
-          description: Deleted
+        '200': {description: Content}
+    delete:
+      summary: Delete Link File
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Deleted}
 
-  # ... System routes omitted for brevity but understood to be present ...
+  # System Management
   /api/system/config:
     get:
       summary: Get global networkd.conf
       responses:
-        '200':
-          description: Content
+        '200': {description: Content}
     post:
       summary: Save global networkd.conf
       requestBody:
@@ -111,26 +170,45 @@ paths:
             schema:
               type: object
               properties:
-                content:
-                  type: string
+                content: {type: string}
       responses:
-        '200':
-          description: Saved
+        '200': {description: Saved}
+
   /api/system/reload:
     post:
       summary: Reload systemd-networkd
       responses:
-        '200':
-          description: Reload successful
+        '200': {description: Success}
+
+  /api/system/reconfigure:
+    get:
+      summary: Reconfigure all interfaces
+      description: Triggers networkctl reconfigure for all devices.
+      responses:
+        '200': {description: Triggered}
+    post:
+      summary: Reconfigure specific or all interfaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                interfaces:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200': {description: Triggered}
+  
   /api/system/routes:
     get:
-      summary: Get routing tables and rules
+      summary: Get routing tables
       responses:
-        '200':
-          description: Output
+        '200': {description: Output}
+
   /api/system/logs:
     get:
-      summary: Get systemd-networkd logs
+      summary: Get logs
       responses:
-        '200':
-          description: Log tail
+        '200': {description: Log tail}

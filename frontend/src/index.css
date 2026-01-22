@@ -1,92 +1,79 @@
 :root {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --accent-primary: #3b82f6; /* Blue 500 */
-  --accent-hover: #2563eb;
-  --border-color: #334155;
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #ef4444;
-
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: dark;
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Default Light Mode Variables */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --border-color: #e5e7eb;
+  --accent-primary: #2563eb;
+  --accent-secondary: #8b5cf6;
+  /* Violet-500 */
+  --accent-hover: #1d4ed8;
+  --success: #10b981;
+  --error: #ef4444;
+  --card-bg: #ffffff;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #111827;
+    --bg-secondary: #0f172a;
+    /* Slightly darker/richer for sidebar */
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --border-color: #374151;
+    --accent-primary: #3b82f6;
+    --accent-secondary: #a78bfa;
+    /* Violet-400 */
+    /* Lighter blue for dark mode */
+    --accent-hover: #60a5fa;
+    --card-bg: #1f2937;
+  }
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
-}
-
-#root {
-  width: 100%;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: var(--bg-tertiary);
-  cursor: pointer;
-  transition: border-color 0.25s, background-color 0.25s;
-}
-
-button:hover {
-  background-color: var(--accent-primary);
-}
-
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-a {
-  font-weight: 500;
-  color: var(--accent-primary);
-  text-decoration: inherit;
-  transition: color 0.25s;
-}
-
-a:hover {
-  color: var(--accent-hover);
-}
-
-h1, h2, h3 {
-  line-height: 1.1;
+  background-color: var(--bg-primary);
   color: var(--text-primary);
+  transition: background-color 0.2s, color 0.2s;
 }
 
-input, select, textarea {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 0.5rem;
+/* Scrollbar Styling for Dark Mode compatibility */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
   border-radius: 4px;
-  font-family: inherit;
 }
 
-input:focus, select:focus, textarea:focus {
-    outline: 2px solid var(--accent-primary);
-    border-color: transparent;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Global inputs/buttons defaults */
+input,
+select,
+textarea {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
 }

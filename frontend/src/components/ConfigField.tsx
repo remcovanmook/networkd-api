@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { type ConfigOption } from '../pages/schema';
+import { type ConfigOption } from '../utils/schemaProcessor';
 
 // Improved validation with OR logic
 const validateInput = (value: string, types: string[]): string | null => {

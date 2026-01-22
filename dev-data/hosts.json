@@ -1,0 +1,8 @@
+[
+  {
+    "name": "networkd-api-test",
+    "host": "172.28.2.103",
+    "user": "networkd-api",
+    "port": 22
+  }
+]

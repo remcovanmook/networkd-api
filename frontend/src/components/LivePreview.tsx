@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { generateINI } from '../utils/configGenerator';
 import { FileText } from 'lucide-react';
-import type { ConfigOption } from '../pages/schema';
+import type { ConfigOption } from '../utils/schemaProcessor';
 
 interface LivePreviewProps {
     type: 'network' | 'netdev' | 'link';

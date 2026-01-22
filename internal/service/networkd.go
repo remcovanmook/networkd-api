@@ -3,11 +3,12 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -23,23 +24,38 @@ type Link struct {
 type NetworkdService struct {
 	ConfigDir        string
 	GlobalConfigPath string
-	conn             *dbus.Conn
+	DataDir          string
+	Schema           *SchemaService
+
+	LocalConnector   *LocalConnector
+	HostManager      *HostManager
+	RemoteConnectors map[string]*SSHConnector
+	connsMu          sync.Mutex
 }
 
-func NewNetworkdService(configDir string) *NetworkdService {
-	// Default to /etc/systemd/network if not specified,
-	// but for development on non-Linux, we might want a safer default or expect the caller to set it.
+func NewNetworkdService(configDir, dataDir string) *NetworkdService {
+	// Default values
 	if configDir == "" {
 		configDir = "/etc/systemd/network"
 	}
+	if dataDir == "" {
+		dataDir = "/var/lib/networkd-api"
+	}
 
-	// Default global config path
+	// Ensure DataDir exists
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		fmt.Printf("Warning: Failed to create DataDir %s: %v\n", dataDir, err)
+	}
+
+	// Ensure SSH Key
+	if err := ensureSSHKey(dataDir); err != nil {
+		fmt.Printf("Warning: Failed to generate SSH key: %v\n", err)
+	}
+
 	globalConfigPath := "/etc/systemd/networkd.conf"
-	// Allow override via env for dev
 	if env := os.Getenv("NETWORKD_GLOBAL_CONFIG"); env != "" {
 		globalConfigPath = env
 	} else if configDir != "/etc/systemd/network" {
-		// If using custom config dir (dev mode), try to place networkd.conf nearby or in tmp
 		globalConfigPath = filepath.Join(filepath.Dir(configDir), "networkd.conf")
 	}
 
@@ -52,68 +68,72 @@ func NewNetworkdService(configDir string) *NetworkdService {
 		}
 	}
 
+	// Initialize Schema Service
+	// Use local schemas directory (symlinked to submodule) or env override
+	schemaBase := "schemas"
+	if env := os.Getenv("NETWORKD_SCHEMA_DIR"); env != "" {
+		schemaBase = env
+	} else if _, err := os.Stat(schemaBase); os.IsNotExist(err) {
+		// Fallback... but now we expect it in project.
+		// We still keep fallback for robust dev env if symlink missing?
+		homeDir, _ := os.UserHomeDir()
+		schemaBase = filepath.Join(homeDir, "networkd-schema", "schemas")
+	}
+
+	sService, err := NewSchemaService(schemaBase)
+	if err != nil {
+		fmt.Printf("Warning: Failed to initialize SchemaService: %v. Validation will be limited.\n", err)
+		// We can still proceed but maybe with empty schemas?
+		sService = &SchemaService{Schemas: make(map[string]map[string]interface{}), TypeCache: make(map[string]map[string]map[string]TypeInfo)}
+	} else {
+		fmt.Printf("Initialized SchemaService with version %s\n", sService.SystemdVersion)
+	}
+
+	localConnector := NewLocalConnector(configDir, conn)
+	hostManager, _ := NewHostManager(dataDir) // Ignore error? Log it?
+
 	return &NetworkdService{
 		ConfigDir:        configDir,
 		GlobalConfigPath: globalConfigPath,
-		conn:             conn,
+		DataDir:          dataDir,
+		Schema:           sService,
+		LocalConnector:   localConnector,
+		HostManager:      hostManager,
+		RemoteConnectors: make(map[string]*SSHConnector),
 	}
 }
 
-// ListLinks retrieves a list of network links from systemd-networkd via D-Bus.
-func (s *NetworkdService) ListLinks() ([]Link, error) {
-	if s.conn == nil {
-		// Mock data for non-Linux dev environments
-		return []Link{
-			{Index: 1, Name: "lo", OperationalState: "carrier", NetworkFile: "", Addresses: []string{"127.0.0.1/8", "::1/128"}},
-			{Index: 2, Name: "eth0", OperationalState: "routable", NetworkFile: "10-eth0.network", Addresses: []string{"192.168.1.5/24", "fe80::1/64"}},
-			{Index: 3, Name: "wlan0", OperationalState: "degraded", NetworkFile: "", Addresses: []string{}},
-		}, nil
+func (s *NetworkdService) GetConnector(host string) (Connector, error) {
+	if host == "" || host == "local" {
+		return s.LocalConnector, nil
 	}
 
-	var links []Link
+	s.connsMu.Lock()
+	defer s.connsMu.Unlock()
 
-	// Check against org.freedesktop.network1.Manager interface
-	obj := s.conn.Object("org.freedesktop.network1", "/org/freedesktop/network1")
+	if conn, ok := s.RemoteConnectors[host]; ok {
+		return conn, nil
+	}
 
-	var result [][]interface{}
-	// ListLinks returns array of structs: (int index, string name, object_path path)
-	err := obj.Call("org.freedesktop.network1.Manager.ListLinks", 0).Store(&result)
+	// Create new
+	cfg, ok := s.HostManager.GetHost(host)
+	if !ok {
+		return nil, fmt.Errorf("unknown host: %s", host)
+	}
+
+	keyFile := filepath.Join(s.DataDir, "id_rsa")
+	conn := NewSSHConnector(cfg.Host, cfg.Port, cfg.User, keyFile)
+	s.RemoteConnectors[host] = conn
+	return conn, nil
+}
+
+// ListLinks retrieves runtime links
+func (s *NetworkdService) ListLinks(host string) ([]Link, error) {
+	c, err := s.GetConnector(host)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call ListLinks: %w", err)
+		return nil, err
 	}
-
-	for _, linkData := range result {
-		if len(linkData) < 2 {
-			continue
-		}
-
-		idx, ok1 := linkData[0].(int32)
-		name, ok2 := linkData[1].(string)
-
-		if !ok1 || !ok2 {
-			continue
-		}
-
-		link := Link{
-			Index:            int(idx),
-			Name:             name,
-			OperationalState: "unknown",
-			Addresses:        []string{},
-		}
-
-		// Fetch Runtime Addresses via Go net package
-		if iface, err := net.InterfaceByIndex(int(idx)); err == nil {
-			if addrs, err := iface.Addrs(); err == nil {
-				for _, addr := range addrs {
-					link.Addresses = append(link.Addresses, addr.String())
-				}
-			}
-		}
-
-		links = append(links, link)
-	}
-
-	return links, nil
+	return c.GetLinks()
 }
 
 type ConfigSummary struct {
@@ -126,26 +146,45 @@ type ConfigSummary struct {
 
 type FileInfo struct {
 	Filename         string         `json:"filename"`
-	Type             string         `json:"type"` // "network" or "netdev"
+	Type             string         `json:"type"`
 	NetDevKind       string         `json:"netdev_kind,omitempty"`
 	NetDevName       string         `json:"netdev_name,omitempty"`
 	NetworkMatchName string         `json:"network_match_name,omitempty"`
 	Summary          *ConfigSummary `json:"summary,omitempty"`
 }
 
-// MatchCriteria defines filters for listing configs
 type MatchCriteria struct {
 	Name       string
 	MACAddress string
 	Type       string
 }
 
-// matches checks if the config match section satisfies the criteria
-// matches checks if the config match section satisfies the criteria
-func (c *MatchCriteria) matches(matchName []string, matchMAC []string, matchType []string) bool {
+func (c *MatchCriteria) matches(matchName interface{}, matchMAC interface{}, matchType interface{}) bool {
+	// Helper to convert interface{} to []string
+	toStringSlice := func(v interface{}) []string {
+		if s, ok := v.(string); ok {
+			return []string{s}
+		}
+		if s, ok := v.([]string); ok {
+			return s
+		}
+		if list, ok := v.([]interface{}); ok {
+			var res []string
+			for _, item := range list {
+				res = append(res, fmt.Sprintf("%v", item))
+			}
+			return res
+		}
+		return nil
+	}
+
+	matchNames := toStringSlice(matchName)
+	matchMACs := toStringSlice(matchMAC)
+	matchTypes := toStringSlice(matchType)
+
 	if c.Name != "" {
 		found := false
-		for _, name := range matchName {
+		for _, name := range matchNames {
 			if name == c.Name {
 				found = true
 				break
@@ -157,7 +196,7 @@ func (c *MatchCriteria) matches(matchName []string, matchMAC []string, matchType
 	}
 	if c.MACAddress != "" {
 		found := false
-		for _, mac := range matchMAC {
+		for _, mac := range matchMACs {
 			if strings.EqualFold(mac, c.MACAddress) {
 				found = true
 				break
@@ -169,7 +208,7 @@ func (c *MatchCriteria) matches(matchName []string, matchMAC []string, matchType
 	}
 	if c.Type != "" {
 		found := false
-		for _, typ := range matchType {
+		for _, typ := range matchTypes {
 			if strings.EqualFold(typ, c.Type) {
 				found = true
 				break
@@ -182,157 +221,244 @@ func (c *MatchCriteria) matches(matchName []string, matchMAC []string, matchType
 	return true
 }
 
-// ListNetDevs returns a list of .netdev files with metadata
-func (s *NetworkdService) ListNetDevs() ([]FileInfo, error) {
-	return s.listFiles(".netdev", nil)
+// List methods
+func (s *NetworkdService) ListNetDevs(host string) ([]FileInfo, error) {
+	return s.listFiles(host, ".netdev", nil)
 }
 
-// ListNetworkConfigs returns a list of .network files with metadata (optional filter)
-func (s *NetworkdService) ListNetworkConfigs(criteria *MatchCriteria) ([]FileInfo, error) {
-	return s.listFiles(".network", criteria)
+func (s *NetworkdService) ListNetworkConfigs(host string, criteria *MatchCriteria) ([]FileInfo, error) {
+	return s.listFiles(host, ".network", criteria)
 }
 
-// ListLinkConfigs returns a list of .link files with metadata (optional filter)
-func (s *NetworkdService) ListLinkConfigs(criteria *MatchCriteria) ([]FileInfo, error) {
-	return s.listFiles(".link", criteria)
+func (s *NetworkdService) ListLinkConfigs(host string, criteria *MatchCriteria) ([]FileInfo, error) {
+	return s.listFiles(host, ".link", criteria)
 }
 
-// listFiles is a helper to list files by suffix
-func (s *NetworkdService) listFiles(suffix string, criteria *MatchCriteria) ([]FileInfo, error) {
-	var files []FileInfo
-	entries, err := os.ReadDir(s.ConfigDir)
+func (s *NetworkdService) listFiles(host, suffix string, criteria *MatchCriteria) ([]FileInfo, error) {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return nil, err
+	}
+	files := []FileInfo{}
+	entries, err := c.ListConfigDir("")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config dir: %w", err)
 	}
 
+	configType := "network"
+	if suffix == ".netdev" {
+		configType = "netdev"
+	}
+	if suffix == ".link" {
+		configType = "link"
+	}
+
 	for _, entry := range entries {
-		if !entry.IsDir() {
-			name := entry.Name()
-			if strings.HasSuffix(name, suffix) {
-				if suffix == ".network" {
-					info := FileInfo{Filename: name, Type: "network"}
-					content, err := s.ReadNetworkFile(name)
-					if err == nil {
-						cfg, _ := ParseNetworkConfig(content)
-						if cfg != nil {
-							// Apply Filter if present
-							if criteria != nil {
-								if !criteria.matches(cfg.Match.Name, cfg.Match.MACAddress, cfg.Match.Type) {
-									continue
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), suffix) {
+			info := FileInfo{Filename: entry.Name(), Type: configType}
+			content, err := s.ReadNetworkFile(host, entry.Name())
+			if err == nil {
+				// Parse using dynamic converter
+				cfg, _ := INIToMap(content, s.Schema, configType)
+				if cfg != nil {
+					// Extract Summary Data from Map
+					// Since it's a map, we need safe access helpers or just direct map access
+					// cfg["Match"] -> map, ["Name"] -> value
+
+					var matchName, matchMAC, matchType interface{}
+					if match, ok := cfg["Match"].(map[string]interface{}); ok {
+						matchName = match["Name"]
+						matchMAC = match["MACAddress"]
+						matchType = match["Type"]
+					}
+
+					if criteria != nil && !criteria.matches(matchName, matchMAC, matchType) {
+						continue
+					}
+
+					// Populate Info
+					if matchNameSlice, ok := matchName.([]string); ok {
+						info.NetworkMatchName = strings.Join(matchNameSlice, ", ")
+					} else if s, ok := matchName.(string); ok {
+						info.NetworkMatchName = s
+					}
+
+					info.Summary = &ConfigSummary{}
+
+					if configType == "network" {
+						if netSec, ok := cfg["Network"].(map[string]interface{}); ok {
+							info.Summary.DHCP = fmt.Sprintf("%v", netSec["DHCP"])
+							// Address, DNS usually arrays
+							if addrs, ok := netSec["Address"].([]interface{}); ok {
+								for _, a := range addrs {
+									info.Summary.Address = append(info.Summary.Address, fmt.Sprintf("%v", a))
 								}
 							}
-
-							if len(cfg.Match.Name) > 0 {
-								info.NetworkMatchName = strings.Join(cfg.Match.Name, ", ")
-							}
-							info.Summary = &ConfigSummary{
-								DHCP:    cfg.Network.DHCP,
-								Address: cfg.Network.Address,
-								DNS:     cfg.Network.DNS,
-								VLAN:    cfg.Network.VLAN,
-							}
-						}
-					}
-					files = append(files, info)
-				} else if suffix == ".netdev" {
-					// NetDevs don't really have Match sections
-					info := FileInfo{Filename: name, Type: "netdev"}
-					content, err := s.ReadNetworkFile(name)
-					if err == nil {
-						cfg, _ := ParseNetDevConfig(content)
-						if cfg != nil {
-							info.NetDevKind = cfg.NetDev.Kind
-							info.NetDevName = cfg.NetDev.Name
-							info.Summary = &ConfigSummary{}
-							if cfg.VLAN != nil {
-								id := cfg.VLAN.Id
-								info.Summary.VlanId = &id
-							}
-						}
-					}
-					files = append(files, info)
-				} else if suffix == ".link" {
-					info := FileInfo{Filename: name, Type: "link"}
-					content, err := s.ReadNetworkFile(name)
-					if err == nil {
-						cfg, _ := ParseLinkConfig(content)
-						if cfg != nil {
-							// Apply Filter if present
-							if criteria != nil {
-								if !criteria.matches(cfg.Match.Name, cfg.Match.MACAddress, cfg.Match.Type) {
-									continue
+							if dnss, ok := netSec["DNS"].([]interface{}); ok {
+								for _, d := range dnss {
+									info.Summary.DNS = append(info.Summary.DNS, fmt.Sprintf("%v", d))
 								}
 							}
-
-							// For link files, we might want to show what they match
-							if len(cfg.Match.Name) > 0 {
-								info.NetworkMatchName = "Match: " + strings.Join(cfg.Match.Name, ", ")
-							} else if len(cfg.Match.MACAddress) > 0 {
-								info.NetworkMatchName = "Match: " + strings.Join(cfg.Match.MACAddress, ", ")
-							}
-							info.Summary = &ConfigSummary{}
+						}
+					} else if configType == "netdev" {
+						if ndSec, ok := cfg["NetDev"].(map[string]interface{}); ok {
+							info.NetDevKind = fmt.Sprintf("%v", ndSec["Kind"])
+							info.NetDevName = fmt.Sprintf("%v", ndSec["Name"])
 						}
 					}
-					files = append(files, info)
 				}
 			}
+			files = append(files, info)
 		}
 	}
 	return files, nil
 }
 
-// ReadNetworkFile reads the content of a specific file
-func (s *NetworkdService) ReadNetworkFile(filename string) (string, error) {
-	// Security check to prevent path traversal
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") {
+func (s *NetworkdService) ReadNetworkFile(host, filename string) (string, error) {
+	if strings.Contains(filename, "..") {
 		return "", fmt.Errorf("invalid filename")
 	}
-	path := filepath.Join(s.ConfigDir, filename)
-	content, err := os.ReadFile(path)
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return "", err
+	}
+	content, err := c.ReadConfigFile(filename)
 	if err != nil {
 		return "", err
 	}
 	return string(content), nil
 }
 
-// WriteNetworkFile writes content to a file
-func (s *NetworkdService) WriteNetworkFile(filename string, content string) error {
-	// Security check
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") {
+func (s *NetworkdService) WriteNetworkFile(host, filename string, content string) error {
+	if strings.Contains(filename, "..") {
 		return fmt.Errorf("invalid filename")
 	}
-	path := filepath.Join(s.ConfigDir, filename)
-	return os.WriteFile(path, []byte(content), 0644)
-}
-
-// DeleteNetworkFile deletes a file
-func (s *NetworkdService) DeleteNetworkFile(filename string) error {
-	// Security check
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") {
-		return fmt.Errorf("invalid filename")
-	}
-	path := filepath.Join(s.ConfigDir, filename)
-	return os.Remove(path)
-}
-
-// GetViewConfig reads the UI layout configuration
-func (s *NetworkdService) GetViewConfig() ([]byte, error) {
-	// Look for .schema-config.json in the config directory
-	path := filepath.Join(s.ConfigDir, ".schema-config.json")
-	content, err := os.ReadFile(path)
+	// TODO: Write validation logic here or earlier?
+	// Handlers usually do validation. Here we just write.
+	c, err := s.GetConnector(host)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return content, nil
+	return c.WriteConfigFile(filename, []byte(content))
 }
 
-// SaveViewConfig saves the UI layout configuration
+func (s *NetworkdService) DeleteNetworkFile(host, filename string) error {
+	if strings.Contains(filename, "..") {
+		return fmt.Errorf("invalid filename")
+	}
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return err
+	}
+	return c.DeleteConfigFile(filename)
+}
+
+func (s *NetworkdService) Reconfigure(host string, devices []string) error {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return err
+	}
+	return c.Reconfigure(devices)
+}
+
+func ensureSSHKey(dataDir string) error {
+	keyPath := filepath.Join(dataDir, "id_rsa")
+	if _, err := os.Stat(keyPath); err == nil {
+		return nil // exists
+	}
+
+	// Generate
+	// Note: ssh-keygen might output to stdout/stderr
+	cmd := exec.Command("ssh-keygen", "-t", "rsa", "-b", "4096", "-f", keyPath, "-N", "")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ssh-keygen failed: %s (%v)", string(output), err)
+	}
+	return nil
+}
+
+func (s *NetworkdService) GetPublicSSHKey() (string, error) {
+	keyPath := filepath.Join(s.DataDir, "id_rsa.pub")
+	content, err := os.ReadFile(keyPath)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
+func (s *NetworkdService) GetSystemdVersion(host string) (string, error) {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return "", err
+	}
+	v := c.GetSystemdVersion()
+	if v != "" {
+		return v, nil
+	}
+	// Fallback for local if connector returns empty (LocalConnector currently does)
+	if host == "" || host == "local" {
+		return s.Schema.SystemdVersion, nil
+	}
+	return "unknown", nil
+}
+
+func (s *NetworkdService) GetViewConfig() ([]byte, error) {
+	path := filepath.Join(s.DataDir, ".schema-config.json")
+	return os.ReadFile(path)
+}
+
 func (s *NetworkdService) SaveViewConfig(content []byte) error {
-	// Validate JSON?
 	if !json.Valid(content) {
 		return fmt.Errorf("invalid json")
 	}
-	path := filepath.Join(s.ConfigDir, ".schema-config.json")
-	fmt.Printf("Saving view config to: %s\n", path)
+	path := filepath.Join(s.DataDir, ".schema-config.json")
 	return os.WriteFile(path, content, 0644)
+}
+
+func (s *NetworkdService) GetGlobalConfig(host string) (string, error) {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return "", err
+	}
+	return c.GetGlobalConfig()
+}
+
+func (s *NetworkdService) SaveGlobalConfig(host, content string) error {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return err
+	}
+	return c.SaveGlobalConfig(content)
+}
+
+func (s *NetworkdService) ReloadNetworkd(host string) (string, error) {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return "", err
+	}
+	return c.ReloadNetworkd()
+}
+
+func (s *NetworkdService) GetRoutes(host string) (string, error) {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return "", err
+	}
+	return c.GetRoutes()
+}
+
+func (s *NetworkdService) GetRules(host string) (string, error) {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return "", err
+	}
+	return c.GetRules()
+}
+
+func (s *NetworkdService) GetLogs(host string) (string, error) {
+	c, err := s.GetConnector(host)
+	if err != nil {
+		return "", err
+	}
+	return c.GetLogs()
 }

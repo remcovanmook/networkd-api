@@ -50,9 +50,13 @@ The server will start on port `8080`.
 
 #### Configuration
 
--   **`NETWORKD_CONFIG_DIR`**: Set this environment variable to specify the directory where `.network` and `.netdev` files are located.
+-   **`NETWORKD_CONFIG_DIR`**: Directory where `.network`, `.netdev`, and `.link` files are located.
     -   Default: `/etc/systemd/network`
-    -   Example for dev: `export NETWORKD_CONFIG_DIR=./tmp`
+    -   Example for dev: `export NETWORKD_CONFIG_DIR=./dev-config`
+
+-   **`NETWORKD_SCHEMA_DIR`**: (Optional) Directory containing JSON schemas (e.g., `schemas/v257`).
+    -   If not set, the server attempts to load schemas from the `schemas/` directory relative to the binary or current working directory.
+    -   The server automatically detects the `systemd` version on the host (`networkctl --version`) and loads the corresponding schema version.
 
 -   **`NETWORKD_GLOBAL_CONFIG`**: Path to the global `networkd.conf` file.
     -   Default: `/etc/systemd/networkd.conf`
