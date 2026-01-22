@@ -76,24 +76,57 @@ The application uses an **Agent/Connector** pattern:
 
 ## API Endpoints
 
-The backend exposes a RESTful API:
+The backend exposes a RESTful API. All endpoints are prefixed with `/api`.
 
-### System & Hosts
--   `GET /api/system/hosts`: List managed hosts.
--   `POST /api/system/hosts`: Add a new remote host.
--   `DELETE /api/system/hosts/{name}`: Remove a host.
--   `GET /api/system/ssh-key`: Retrieve the public SSH key for setting up remote access.
--   `GET /api/system/status`: Get networkd status (local or active remote).
--   `POST /api/system/reload`: Reload networkd daemon.
--   `POST /api/system/reconfigure`: Trigger reconfiguration of interfaces.
+### Generic Resources
+-   `GET /api/schemas`: Retrieve all loaded JSON schemas.
+-   `GET /api/view-config`: Get current UI view preferences.
 
-### Network Resources
-All resource endpoints respect the `X-Target-Host` header to route requests to the correct machine.
+### Network Configuration
+These endpoints respect the `X-Target-Host` header to target a specific remote host.
 
--   **Networks** (`.network`): `GET/POST/DELETE /api/networks`
--   **NetDevs** (`.netdev`): `GET/POST/DELETE /api/netdevs`
--   **Links** (`.link`): `GET/POST/DELETE /api/links`
--   **Configs**: `GET /api/{type}/{filename}` to fetch specific file content.
+-   **Virtual Devices (.netdev)**:
+    -   `GET /api/netdevs`: List all netdev files.
+    -   `POST /api/netdevs`: Create a new netdev file.
+    -   `GET /api/netdevs/{filename}`: Unused (alias for generic config retrieval).
+    -   `DELETE /api/netdevs/{filename}`: Delete a netdev file.
+
+-   **Networks (.network)**:
+    -   `GET /api/networks`: List all network files.
+    -   `POST /api/networks`: Create a new network file.
+    -   `GET /api/networks/{filename}`: Unused (alias for generic config retrieval).
+    -   `DELETE /api/networks/{filename}`: Delete a network file.
+
+-   **Links (.link)**:
+    -   `GET /api/links`: List all link files (and runtime links).
+    -   `POST /api/links`: Create a new link file.
+    -   `GET /api/links/{filename}`: Unused (alias for generic config retrieval).
+    -   `DELETE /api/links/{filename}`: Delete a link file.
+
+-   **File Content**:
+    -   `GET /api/{type}/{filename}`: Retrieve parsed content of a specific file (where type is `netdevs`, `networks`, or `links`).
+
+### System Management
+System operations also respect the `X-Target-Host` header.
+
+-   `GET /api/system/status`: Get systemd-networkd status and version.
+-   `GET /api/system/config`: Get global networkd.conf.
+-   `POST /api/system/config`: Save global networkd.conf.
+-   `GET /api/system/view-config`: Get system-level view config.
+-   `POST /api/system/view-config`: Save system-level view config.
+-   `POST /api/system/reload`: Reload the networkd daemon.
+-   `GET /api/system/reconfigure`: Trigger reconfiguration (GET is supported but POST preferred).
+-   `POST /api/system/reconfigure`: Trigger reconfiguration for specific interfaces.
+-   `GET /api/system/ssh-key`: Get the backend's public SSH key for remote setup.
+-   `GET /api/system/routes`: List current network routes.
+-   `GET /api/system/logs`: Fetch recent networkd logs.
+
+### Host Management
+Endpoints for managing the registry of remote hosts.
+
+-   `GET /api/system/hosts`: List all registered hosts.
+-   `POST /api/system/hosts`: Register a new host.
+-   `DELETE /api/system/hosts/{name}`: Deregister a host.
 
 ## Production Deployment
 
