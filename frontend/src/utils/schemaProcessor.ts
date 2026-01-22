@@ -92,7 +92,7 @@ function mapType(prop: any, definitions: any): { type: string, types: string[], 
     return { type: primaryType, types, options };
 }
 
-export function processSchema(schema: any): SchemaMap {
+export function processSchema(schema: any, targetVersion: number | null = null): SchemaMap {
     const definitions = schema.definitions || {};
     const sections: SchemaMap = {};
 
@@ -131,6 +131,14 @@ export function processSchema(schema: any): SchemaMap {
 
         if (!objectDef.properties && !objectDef.oneOf && !objectDef.allOf) continue;
 
+        // Check section version_added if present (less common for top-level, but good to support)
+        if (targetVersion !== null && objectDef.version_added) {
+            const added = parseInt(objectDef.version_added, 10);
+            if (!isNaN(added) && added > targetVersion) {
+                continue; // Skip entire section
+            }
+        }
+
         // If objectDef doesn't have properties directly, it might be an allOf/oneOf mix.
         // For now assume properties exist or we skip.
         // In systemd schema, sections usually have properties.
@@ -138,6 +146,14 @@ export function processSchema(schema: any): SchemaMap {
         const optionsDocs: ConfigOption[] = [];
 
         for (const [key, propDef] of Object.entries(sectionProps) as [string, any][]) {
+            // Version Filtering Logic
+            if (targetVersion !== null && propDef.version_added) {
+                const added = parseInt(propDef.version_added, 10);
+                if (!isNaN(added) && added > targetVersion) {
+                    continue; // Skip this field
+                }
+            }
+
             const { type, types, options } = mapType(propDef, definitions);
             const description = propDef.description || '';
 

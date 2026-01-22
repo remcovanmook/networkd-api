@@ -55,13 +55,13 @@ export const SchemaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const rawSchemas = schemaRes.data;
 
                 if (rawSchemas.network) {
-                    setNetworkSections(processSchema(rawSchemas.network));
+                    setNetworkSections(processSchema(rawSchemas.network, parseVersion(realVer)));
                 }
                 if (rawSchemas.netdev) {
-                    setNetDevSections(processSchema(rawSchemas.netdev));
+                    setNetDevSections(processSchema(rawSchemas.netdev, parseVersion(realVer)));
                 }
                 if (rawSchemas.link) {
-                    setLinkSections(processSchema(rawSchemas.link));
+                    setLinkSections(processSchema(rawSchemas.link, parseVersion(realVer)));
                 }
                 setError(null);
             } catch (err: any) {
@@ -93,3 +93,12 @@ export const SchemaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 };
 
 export const useSchema = () => useContext(SchemaContext);
+
+function parseVersion(versionStr: string): number | null {
+    if (!versionStr) return null;
+    const match = versionStr.match(/(\d+)/);
+    if (match && match[1]) {
+        return parseInt(match[1], 10);
+    }
+    return null;
+}
