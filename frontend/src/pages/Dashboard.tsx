@@ -4,7 +4,7 @@ import { useToast } from '../components/ToastContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 
-import { Activity, ArrowRight, Network as NetworkIcon, Sliders, Trash2, RefreshCw, Zap, Plus, Layers } from 'lucide-react';
+import { Activity, ArrowRight, Network as NetworkIcon, Sliders, Trash2, RefreshCw, Zap, Plus, TrainFrontTunnel } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
@@ -255,7 +255,7 @@ const Dashboard: React.FC = () => {
                 {/* Column 2: Virtual Devices */}
                 <div>
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '2px solid var(--accent-secondary)', paddingBottom: '0.5rem' }}>
-                        <Layers color="var(--accent-secondary)" />
+                        <TrainFrontTunnel color="var(--accent-secondary)" />
                         Virtual Devices
                     </h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
