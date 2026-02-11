@@ -155,8 +155,11 @@ func (s *SchemaService) buildTypeCache(configType string, schema map[string]inte
 		s.RepeatableSections[configType] = make(map[string]bool)
 	}
 
-	definitions := schema["definitions"].(map[string]interface{})
-	properties := schema["properties"].(map[string]interface{})
+	definitions, _ := schema["definitions"].(map[string]interface{})
+	properties, ok := schema["properties"].(map[string]interface{})
+	if !ok {
+		return
+	}
 
 	for sectionName, sectionVal := range properties {
 		sectionDef, ok := sectionVal.(map[string]interface{})
@@ -177,8 +180,6 @@ func (s *SchemaService) buildTypeCache(configType string, schema map[string]inte
 		}
 
 		// Find the object properties within this section definition
-		var objectProps map[string]interface{}
-
 		var findProps func(node map[string]interface{}) map[string]interface{}
 		findProps = func(node map[string]interface{}) map[string]interface{} {
 			if props, ok := node["properties"].(map[string]interface{}); ok {
@@ -186,8 +187,10 @@ func (s *SchemaService) buildTypeCache(configType string, schema map[string]inte
 			}
 			if oneOf, ok := node["oneOf"].([]interface{}); ok {
 				for _, v := range oneOf {
-					if res := findProps(v.(map[string]interface{})); res != nil {
-						return res
+					if m, ok := v.(map[string]interface{}); ok {
+						if res := findProps(m); res != nil {
+							return res
+						}
 					}
 				}
 			}
@@ -199,7 +202,7 @@ func (s *SchemaService) buildTypeCache(configType string, schema map[string]inte
 			return nil
 		}
 
-		objectProps = findProps(sectionDef)
+		objectProps := findProps(sectionDef)
 		if objectProps == nil {
 			continue
 		}
@@ -209,7 +212,10 @@ func (s *SchemaService) buildTypeCache(configType string, schema map[string]inte
 		}
 
 		for key, propVal := range objectProps {
-			propDef := propVal.(map[string]interface{})
+			propDef, ok := propVal.(map[string]interface{})
+			if !ok {
+				continue
+			}
 			info := s.resolveType(propDef, definitions)
 			s.TypeCache[configType][sectionName][key] = info
 		}
@@ -219,7 +225,6 @@ func (s *SchemaService) buildTypeCache(configType string, schema map[string]inte
 func (s *SchemaService) resolveType(propDef map[string]interface{}, definitions map[string]interface{}) TypeInfo {
 	info := TypeInfo{}
 
-	// Recursive helper
 	var analyze func(p map[string]interface{})
 	analyze = func(p map[string]interface{}) {
 		if ref, ok := p["$ref"].(string); ok {
@@ -227,7 +232,6 @@ func (s *SchemaService) resolveType(propDef map[string]interface{}, definitions 
 			if def, ok := definitions[refName].(map[string]interface{}); ok {
 				analyze(def)
 			}
-			// Special handling for known refs if needed, but recursive should work if definitions are standard
 			return
 		}
 
@@ -245,17 +249,23 @@ func (s *SchemaService) resolveType(propDef map[string]interface{}, definitions 
 
 		if oneOf, ok := p["oneOf"].([]interface{}); ok {
 			for _, v := range oneOf {
-				analyze(v.(map[string]interface{}))
+				if m, ok := v.(map[string]interface{}); ok {
+					analyze(m)
+				}
 			}
 		}
 		if anyOf, ok := p["anyOf"].([]interface{}); ok {
 			for _, v := range anyOf {
-				analyze(v.(map[string]interface{}))
+				if m, ok := v.(map[string]interface{}); ok {
+					analyze(m)
+				}
 			}
 		}
 		if allOf, ok := p["allOf"].([]interface{}); ok {
 			for _, v := range allOf {
-				analyze(v.(map[string]interface{}))
+				if m, ok := v.(map[string]interface{}); ok {
+					analyze(m)
+				}
 			}
 		}
 	}

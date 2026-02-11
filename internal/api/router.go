@@ -20,43 +20,40 @@ func NewRouter(h *Handler, staticDir string) http.Handler {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000"}, // Vite default and others
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Target-Host"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
 	r.Route("/api", func(r chi.Router) {
-		r.Get("/schemas", h.GetSchemas)        // JSON Schemas
-		r.Get("/view-config", h.GetViewConfig) // UI View Prefs
+		r.Get("/schemas", h.GetSchemas) // JSON Schemas
 
 		// NetDevs (.netdev)
 		r.Get("/netdevs", h.ListNetDevs)
 		r.Post("/netdevs", h.CreateNetDev)
-		r.Get("/netdevs/{filename}", h.GetNetworkConfig)
+		r.Get("/netdevs/{filename}", h.GetConfig)
 		r.Put("/netdevs/{filename}", h.UpdateNetDev)
-		r.Delete("/netdevs/{filename}", h.DeleteNetwork)
+		r.Delete("/netdevs/{filename}", h.DeleteConfig)
 
 		// Networks (.network)
 		r.Get("/networks", h.ListNetworks)
 		r.Post("/networks", h.CreateNetwork)
-		r.Get("/networks/{filename}", h.GetNetworkConfig)
+		r.Get("/networks/{filename}", h.GetConfig)
 		r.Put("/networks/{filename}", h.UpdateNetwork)
-		r.Delete("/networks/{filename}", h.DeleteNetwork)
+		r.Delete("/networks/{filename}", h.DeleteConfig)
 
 		// Links (.link)
 		r.Get("/links", h.ListLinks)
 		r.Post("/links", h.CreateLink)
-		r.Get("/links/{filename}", h.GetNetworkConfig)
+		r.Get("/links/{filename}", h.GetConfig)
 		r.Put("/links/{filename}", h.UpdateLink)
-		r.Delete("/links/{filename}", h.DeleteNetwork)
+		r.Delete("/links/{filename}", h.DeleteConfig)
 
 		// System Management
 		r.Get("/system/status", h.GetSystemStatus)
 		r.Get("/system/config", h.GetGlobalConfig)
 		r.Post("/system/config", h.SaveGlobalConfig)
-		r.Get("/system/view-config", h.GetViewConfig)
-		r.Post("/system/view-config", h.SaveViewConfig)
 		r.Post("/system/reload", h.ReloadNetworkd)
 		r.Get("/system/reconfigure", h.ReconfigureSystem)
 		r.Post("/system/reconfigure", h.ReconfigureSystem)

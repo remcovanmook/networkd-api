@@ -24,6 +24,12 @@ type SSHConnector struct {
 	ConfigDir string // Remote config dir, e.g. /etc/systemd/network
 }
 
+// shellQuote wraps a string in single quotes for safe use in shell commands,
+// escaping any embedded single quotes.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
 func NewSSHConnector(host string, port int, user, keyFile string) *SSHConnector {
 	return &SSHConnector{
 		Host:      host,
@@ -119,8 +125,7 @@ func (c *SSHConnector) ReadConfigFile(filename string) ([]byte, error) {
 	defer session.Close()
 
 	remotePath := filepath.Join(c.ConfigDir, filename)
-	// Use sudo cat
-	cmd := fmt.Sprintf("sudo cat %s", remotePath)
+	cmd := fmt.Sprintf("sudo cat -- %s", shellQuote(remotePath))
 	return session.Output(cmd)
 }
 
@@ -136,12 +141,8 @@ func (c *SSHConnector) WriteConfigFile(filename string, content []byte) error {
 
 	session.Stdin = bytes.NewReader(content)
 	remotePath := filepath.Join(c.ConfigDir, filename)
-	// Use sudo tee, silence stdout
-	cmd := fmt.Sprintf("sudo tee %s", remotePath)
-	// We capture output to avoid polluting logs, but ignoring it is fine if we check error.
-	// However, sudo tee writes to stdout. We can redirect to /dev/null?
-	// `sudo tee file > /dev/null`
-	if err := session.Run(cmd + " > /dev/null"); err != nil {
+	cmd := fmt.Sprintf("sudo tee -- %s > /dev/null", shellQuote(remotePath))
+	if err := session.Run(cmd); err != nil {
 		return fmt.Errorf("failed to write file: %v", err)
 	}
 	return nil
@@ -158,7 +159,7 @@ func (c *SSHConnector) DeleteConfigFile(filename string) error {
 	defer session.Close()
 
 	remotePath := filepath.Join(c.ConfigDir, filename)
-	cmd := fmt.Sprintf("sudo rm %s", remotePath)
+	cmd := fmt.Sprintf("sudo rm -- %s", shellQuote(remotePath))
 	return session.Run(cmd)
 }
 
@@ -172,13 +173,12 @@ func (c *SSHConnector) Reconfigure(devices []string) error {
 	}
 	defer session.Close()
 
-	cmd := "networkctl reconfigure"
+	cmd := "sudo networkctl reconfigure"
 	if len(devices) > 0 {
-		// Sanitize inputs slightly?
-		cmd += " " + strings.Join(devices, " ")
+		for _, d := range devices {
+			cmd += " " + shellQuote(d)
+		}
 	}
-	// Assuming sudo NOPASSWD configured
-	cmd = "sudo " + cmd
 
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {

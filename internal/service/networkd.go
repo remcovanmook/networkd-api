@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -320,9 +319,21 @@ func (s *NetworkdService) listFiles(host, suffix string, criteria *MatchCriteria
 	return files, nil
 }
 
+// validateFilename ensures the filename is a flat name with no path components.
+func validateFilename(filename string) error {
+	if filename == "" {
+		return fmt.Errorf("empty filename")
+	}
+	cleaned := filepath.Clean(filename)
+	if cleaned != filename || filepath.IsAbs(filename) || strings.ContainsAny(filename, "/\\") {
+		return fmt.Errorf("invalid filename: %q", filename)
+	}
+	return nil
+}
+
 func (s *NetworkdService) ReadNetworkFile(host, filename string) (string, error) {
-	if strings.Contains(filename, "..") {
-		return "", fmt.Errorf("invalid filename")
+	if err := validateFilename(filename); err != nil {
+		return "", err
 	}
 	c, err := s.GetConnector(host)
 	if err != nil {
@@ -336,11 +347,9 @@ func (s *NetworkdService) ReadNetworkFile(host, filename string) (string, error)
 }
 
 func (s *NetworkdService) WriteNetworkFile(host, filename string, content string) error {
-	if strings.Contains(filename, "..") {
-		return fmt.Errorf("invalid filename")
+	if err := validateFilename(filename); err != nil {
+		return err
 	}
-	// TODO: Write validation logic here or earlier?
-	// Handlers usually do validation. Here we just write.
 	c, err := s.GetConnector(host)
 	if err != nil {
 		return err
@@ -349,8 +358,8 @@ func (s *NetworkdService) WriteNetworkFile(host, filename string, content string
 }
 
 func (s *NetworkdService) DeleteNetworkFile(host, filename string) error {
-	if strings.Contains(filename, "..") {
-		return fmt.Errorf("invalid filename")
+	if err := validateFilename(filename); err != nil {
+		return err
 	}
 	c, err := s.GetConnector(host)
 	if err != nil {
@@ -406,19 +415,6 @@ func (s *NetworkdService) GetSystemdVersion(host string) (string, error) {
 		return s.Schema.RealVersion, nil
 	}
 	return "unknown", nil
-}
-
-func (s *NetworkdService) GetViewConfig() ([]byte, error) {
-	path := filepath.Join(s.DataDir, "frontend-prefs.json")
-	return os.ReadFile(path)
-}
-
-func (s *NetworkdService) SaveViewConfig(content []byte) error {
-	if !json.Valid(content) {
-		return fmt.Errorf("invalid json")
-	}
-	path := filepath.Join(s.DataDir, "frontend-prefs.json")
-	return os.WriteFile(path, content, 0644)
 }
 
 func (s *NetworkdService) GetGlobalConfig(host string) (string, error) {
