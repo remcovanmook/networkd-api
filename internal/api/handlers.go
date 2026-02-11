@@ -2,10 +2,8 @@ package api
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"networkd-api/internal/service"
-	"os"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -78,7 +76,7 @@ func (h *Handler) ListLinks(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(files)
 }
 
-func (h *Handler) GetNetworkConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	filename := chi.URLParam(r, "filename")
 	content, err := h.Service.ReadNetworkFile(getHost(r), filename)
 	if err != nil {
@@ -218,7 +216,7 @@ func (h *Handler) handleUpdate(w http.ResponseWriter, r *http.Request, configTyp
 	json.NewEncoder(w).Encode(map[string]string{"message": "Configuration updated"})
 }
 
-func (h *Handler) DeleteNetwork(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 	filename := chi.URLParam(r, "filename")
 	if err := h.Service.DeleteNetworkFile(getHost(r), filename); err != nil {
 		http.Error(w, "Failed to delete file: "+err.Error(), http.StatusInternalServerError)
@@ -286,7 +284,7 @@ func (h *Handler) AddHost(w http.ResponseWriter, r *http.Request) {
 		host.Port = 22
 	}
 
-	if err := h.Service.HostManager.AddHostSafe(host); err != nil {
+	if err := h.Service.HostManager.AddHost(host); err != nil {
 		http.Error(w, "Failed to add host: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -311,11 +309,11 @@ func (h *Handler) ReconfigureSystem(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodPost && r.ContentLength > 0 {
 		var req reconfigureRequest
-		// Ignore error if body is empty or invalid structure, just act as reconfigure-all?
-		// Or specific check?
-		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
-			devices = req.Interfaces
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
 		}
+		devices = req.Interfaces
 	}
 
 	if err := h.Service.Reconfigure(getHost(r), devices); err != nil {
@@ -323,7 +321,7 @@ func (h *Handler) ReconfigureSystem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Reconfiguration triggered"})
 }
 
@@ -342,42 +340,6 @@ func (h *Handler) GetPublicSSHKey(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetSchemas(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(h.Service.Schema.Schemas)
-}
-
-// GetViewConfig returns the UI layout configuration
-func (h *Handler) GetViewConfig(w http.ResponseWriter, r *http.Request) {
-	config, err := h.Service.GetViewConfig()
-	if err != nil {
-		if os.IsNotExist(err) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte("{}"))
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(config)
-}
-
-// SaveViewConfig saves the UI layout configuration
-func (h *Handler) SaveViewConfig(w http.ResponseWriter, r *http.Request) {
-	// Read raw body since we are just saving JSON to file
-	// Limit body size to avoid DoS
-	r.Body = http.MaxBytesReader(w, r.Body, 1024*1024) // 1MB max for config
-	content, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Failed to read body: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if err := h.Service.SaveViewConfig(content); err != nil {
-		http.Error(w, "Failed to save config: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "View configuration saved"})
 }
 
 func getHost(r *http.Request) string {

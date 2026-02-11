@@ -77,35 +77,6 @@ func (hm *HostManager) Save() error {
 
 func (hm *HostManager) AddHost(h HostConfig) error {
 	hm.mu.Lock()
-	defer hm.mu.Unlock()
-	if h.Name == "local" {
-		return fmt.Errorf("reserved name 'local'")
-	}
-	hm.Hosts[h.Name] = h
-	// Release lock before Save to avoid deadlock if Save used lock (it uses RLock, so mostly fine, but Save calls RLock while we hold Lock -> fine? No, Lock blocks RLock)
-	// Actually Save uses RLock. If we hold Lock, RLock blocks.
-	// So we should save after unlocking or use internal save.
-	// Let's just defer unlock and Save manually or unlock first.
-	// Better:
-	// hm.Hosts[h.Name] = h
-	// unlock
-	// Save
-	// But that leaves a gap.
-	// I'll implementation internal save or just Copy-on-Write logic.
-	// For simplicity:
-	// return hm.saveInternal() // which writes file
-	return nil // Caller calls Save? No, should be atomic.
-}
-
-// Checking deadlock again:
-// Func A locks. Calls B. B locks -> Deadlock.
-// Save() locks RLock.
-// If AddHost holds Lock, Save cannot take RLock.
-// So AddHost must not call Save directly if Save takes lock.
-// I will implement correct locking.
-
-func (hm *HostManager) AddHostSafe(h HostConfig) error {
-	hm.mu.Lock()
 	if h.Name == "local" {
 		hm.mu.Unlock()
 		return fmt.Errorf("reserved name 'local'")

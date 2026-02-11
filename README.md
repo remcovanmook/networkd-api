@@ -82,10 +82,9 @@ All configuration and system endpoints respect the `X-Target-Host` header (or `?
 
 Configurations submitted via `POST` and `PUT` are validated against the JSON Schema for the target systemd version before being written.
 
-### Schemas & Preferences
+### Schemas
 
 -   `GET /api/schemas`: Retrieve all loaded JSON schemas (network, netdev, link, networkd-conf).
--   `GET /api/view-config`: Get current UI view preferences.
 
 ### Configuration Files
 
@@ -108,8 +107,6 @@ The same pattern applies to `/api/netdevs` (`.netdev` files) and `/api/links` (`
 | `GET`      | `/api/system/status`         | System info: detected systemd version, resolved schema version, runtime interfaces.          |
 | `GET`      | `/api/system/config`         | Read global `networkd.conf`.                                                                 |
 | `POST`     | `/api/system/config`         | Save global `networkd.conf`. Body: `{ "content": "..." }`                                    |
-| `GET`      | `/api/system/view-config`    | Get UI layout preferences.                                                                   |
-| `POST`     | `/api/system/view-config`    | Save UI layout preferences.                                                                  |
 | `POST`     | `/api/system/reload`         | Reload systemd-networkd.                                                                     |
 | `GET/POST` | `/api/system/reconfigure`    | Trigger `networkctl reconfigure`. POST body: `{ "interfaces": ["eth0"] }`                    |
 | `GET`      | `/api/system/ssh-key`        | Get the backend's public SSH key for remote host setup.                                      |

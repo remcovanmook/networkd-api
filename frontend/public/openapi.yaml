@@ -48,14 +48,6 @@ paths:
         '200':
           description: Map of schema type to JSON schema object
 
-  /api/view-config:
-    get:
-      summary: Get UI View Preferences
-      description: Returns current UI layout and view preferences.
-      responses:
-        '200':
-          description: View configuration object
-
   # Networks (.network)
   /api/networks:
     get:
@@ -278,22 +270,6 @@ paths:
               type: object
               properties:
                 content: {type: string}
-      responses:
-        '200': {description: Saved}
-
-  /api/system/view-config:
-    get:
-      summary: Get UI View Preferences (system)
-      description: Get UI layout preferences via the system path.
-      responses:
-        '200': {description: View configuration}
-    post:
-      summary: Save UI View Preferences
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
       responses:
         '200': {description: Saved}
 
