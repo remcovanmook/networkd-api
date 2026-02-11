@@ -1,15 +1,248 @@
 openapi: 3.0.0
 info:
   title: Networkd API
-  description: API for managing systemd-networkd configurations and system state.
-  version: 1.2.0
+  description: API for managing systemd-networkd configurations and system state across local and remote hosts.
+  version: 2.0.0
 servers:
   - url: http://localhost:8080
+
+components:
+  parameters:
+    TargetHost:
+      name: X-Target-Host
+      in: header
+      required: false
+      description: Target a specific remote host. If omitted, the local system is used.
+      schema: {type: string}
+    Filename:
+      name: filename
+      in: path
+      required: true
+      schema: {type: string}
+    HostName:
+      name: name
+      in: path
+      required: true
+      schema: {type: string}
+  schemas:
+    ConfigCreate:
+      type: object
+      required: [filename, config]
+      properties:
+        filename: {type: string}
+        config: {type: object}
+    ConfigUpdate:
+      type: object
+      required: [config]
+      properties:
+        config: {type: object}
+
 paths:
+  /api/schemas:
+    get:
+      summary: Get Loaded JSON Schemas
+      description: Returns the raw JSON schemas for all configuration file types (network, netdev, link, networkd-conf).
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '200':
+          description: Map of schema type to JSON schema object
+
+  /api/view-config:
+    get:
+      summary: Get UI View Preferences
+      description: Returns current UI layout and view preferences.
+      responses:
+        '200':
+          description: View configuration object
+
+  # Networks (.network)
+  /api/networks:
+    get:
+      summary: List Network Files
+      description: Returns a list of all `.network` files with parsed summaries. Supports filtering.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
+        - name: name
+          in: query
+          schema: {type: string}
+        - name: macaddress
+          in: query
+          schema: {type: string}
+        - name: type
+          in: query
+          schema: {type: string}
+      responses:
+        '200':
+          description: List of network files
+    post:
+      summary: Create Network File
+      description: Create a new `.network` file. Config is validated against the JSON Schema for the target systemd version.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigCreate'
+      responses:
+        '201': {description: Created}
+        '400': {description: Validation error}
+
+  /api/networks/{filename}:
+    get:
+      summary: Get Network Content
+      description: Read and parse a specific `.network` file, returning JSON.
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '200': {description: Parsed configuration}
+        '404': {description: File not found}
+    put:
+      summary: Update Network File
+      description: Update an existing `.network` file. Config is validated against the JSON Schema.
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigUpdate'
+      responses:
+        '200': {description: Updated}
+        '400': {description: Validation error}
+        '404': {description: File not found}
+    delete:
+      summary: Delete Network File
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '204': {description: Deleted}
+
+  # NetDevs (.netdev)
+  /api/netdevs:
+    get:
+      summary: List NetDev Files
+      description: Returns a list of all `.netdev` files.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '200':
+          description: List of netdev files
+    post:
+      summary: Create NetDev File
+      description: Create a new `.netdev` file. Config is validated against the JSON Schema.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigCreate'
+      responses:
+        '201': {description: Created}
+        '400': {description: Validation error}
+
+  /api/netdevs/{filename}:
+    get:
+      summary: Get NetDev Content
+      description: Read and parse a specific `.netdev` file, returning JSON.
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '200': {description: Parsed configuration}
+        '404': {description: File not found}
+    put:
+      summary: Update NetDev File
+      description: Update an existing `.netdev` file. Config is validated against the JSON Schema.
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigUpdate'
+      responses:
+        '200': {description: Updated}
+        '400': {description: Validation error}
+        '404': {description: File not found}
+    delete:
+      summary: Delete NetDev File
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '204': {description: Deleted}
+
+  # Links (.link)
+  /api/links:
+    get:
+      summary: List Link Files
+      description: Returns a list of all `.link` files.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '200':
+          description: List of link files
+    post:
+      summary: Create Link File
+      description: Create a new `.link` file. Config is validated against the JSON Schema.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigCreate'
+      responses:
+        '201': {description: Created}
+        '400': {description: Validation error}
+
+  /api/links/{filename}:
+    get:
+      summary: Get Link Content
+      description: Read and parse a specific `.link` file, returning JSON.
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '200': {description: Parsed configuration}
+        '404': {description: File not found}
+    put:
+      summary: Update Link File
+      description: Update an existing `.link` file. Config is validated against the JSON Schema.
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigUpdate'
+      responses:
+        '200': {description: Updated}
+        '400': {description: Validation error}
+        '404': {description: File not found}
+    delete:
+      summary: Delete Link File
+      parameters:
+        - $ref: '#/components/parameters/Filename'
+        - $ref: '#/components/parameters/TargetHost'
+      responses:
+        '204': {description: Deleted}
+
+  # System Management
   /api/system/status:
     get:
       summary: Get System Status
-      description: Returns system details including detected systemd version and active runtime interfaces.
+      description: Returns system details including detected systemd version, resolved schema version, and active runtime interfaces.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
       responses:
         '200':
           description: System status
@@ -20,150 +253,24 @@ paths:
                 properties:
                   systemd_version:
                     type: string
+                  schema_version:
+                    type: string
                   interfaces:
                     type: array
                     items:
                       type: object
 
-  /api/schemas:
-    get:
-      summary: Get Loaded JSON Schemas
-      description: Returns the raw JSON schemas for networkd configuration files.
-      responses:
-        '200':
-          description: Map of schemas
-
-  /api/netdevs:
-    get:
-      summary: List NetDev Files
-      description: Returns a list of all stored `.netdev` files.
-      responses:
-        '200':
-          description: List of files
-    post:
-      summary: Create NetDev File
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [filename, config]
-              properties:
-                filename: {type: string}
-                config: {type: object}
-      responses:
-        '201': {description: Created}
-
-  /api/netdevs/{filename}:
-    get:
-      summary: Get NetDev Content
-      parameters:
-        - name: filename
-          in: path
-          required: true
-          schema: {type: string}
-      responses:
-        '200': {description: Content}
-    delete:
-      summary: Delete NetDev File
-      parameters:
-        - name: filename
-          in: path
-          required: true
-          schema: {type: string}
-      responses:
-        '204': {description: Deleted}
-
-  /api/networks:
-    get:
-      summary: List Network Files
-      description: Returns a list of all stored `.network` files.
-      responses:
-        '200':
-          description: List of files
-    post:
-      summary: Create Network File
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [filename, config]
-              properties:
-                filename: {type: string}
-                config: {type: object}
-      responses:
-        '201': {description: Created}
-
-  /api/networks/{filename}:
-    get:
-      summary: Get Network Content
-      parameters:
-        - name: filename
-          in: path
-          required: true
-          schema: {type: string}
-      responses:
-        '200': {description: Content}
-    delete:
-      summary: Delete Network File
-      parameters:
-        - name: filename
-          in: path
-          required: true
-          schema: {type: string}
-      responses:
-        '204': {description: Deleted}
-
-  /api/links:
-    get:
-      summary: List Link Files
-      description: Returns a list of all stored `.link` files.
-      responses:
-        '200':
-          description: List of files
-    post:
-      summary: Create Link File
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [filename, config]
-              properties:
-                filename: {type: string}
-                config: {type: object}
-      responses:
-        '201': {description: Created}
-
-  /api/links/{filename}:
-    get:
-      summary: Get Link Content
-      parameters:
-        - name: filename
-          in: path
-          required: true
-          schema: {type: string}
-      responses:
-        '200': {description: Content}
-    delete:
-      summary: Delete Link File
-      parameters:
-        - name: filename
-          in: path
-          required: true
-          schema: {type: string}
-      responses:
-        '204': {description: Deleted}
-
-  # System Management
   /api/system/config:
     get:
       summary: Get global networkd.conf
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
       responses:
         '200': {description: Content}
     post:
       summary: Save global networkd.conf
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
       requestBody:
         content:
           application/json:
@@ -174,9 +281,27 @@ paths:
       responses:
         '200': {description: Saved}
 
+  /api/system/view-config:
+    get:
+      summary: Get UI View Preferences (system)
+      description: Get UI layout preferences via the system path.
+      responses:
+        '200': {description: View configuration}
+    post:
+      summary: Save UI View Preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200': {description: Saved}
+
   /api/system/reload:
     post:
       summary: Reload systemd-networkd
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
       responses:
         '200': {description: Success}
 
@@ -184,10 +309,14 @@ paths:
     get:
       summary: Reconfigure all interfaces
       description: Triggers networkctl reconfigure for all devices.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
       responses:
         '200': {description: Triggered}
     post:
       summary: Reconfigure specific or all interfaces
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
       requestBody:
         content:
           application/json:
@@ -200,15 +329,79 @@ paths:
                     type: string
       responses:
         '200': {description: Triggered}
-  
+
+  /api/system/ssh-key:
+    get:
+      summary: Get Public SSH Key
+      description: Returns the backend's public SSH key for setting up remote host access.
+      responses:
+        '200':
+          description: Public SSH key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  public_key: {type: string}
+
   /api/system/routes:
     get:
       summary: Get routing tables
+      description: Returns current routes and routing policy rules.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
       responses:
-        '200': {description: Output}
+        '200': {description: Routes output}
 
   /api/system/logs:
     get:
       summary: Get logs
+      description: Returns recent systemd-networkd journal entries.
+      parameters:
+        - $ref: '#/components/parameters/TargetHost'
       responses:
-        '200': {description: Log tail}
+        '200': {description: Log entries}
+
+  # Host Management
+  /api/system/hosts:
+    get:
+      summary: List Remote Hosts
+      description: Returns all registered remote hosts.
+      responses:
+        '200':
+          description: List of hosts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: {type: string}
+                    host: {type: string}
+                    user: {type: string}
+                    port: {type: integer}
+    post:
+      summary: Register Remote Host
+      description: Register a new remote host for management.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, host]
+              properties:
+                name: {type: string}
+                host: {type: string}
+                user: {type: string}
+                port: {type: integer, default: 22}
+      responses:
+        '201': {description: Host registered}
+
+  /api/system/hosts/{name}:
+    delete:
+      summary: Deregister Remote Host
+      parameters:
+        - $ref: '#/components/parameters/HostName'
+      responses:
+        '204': {description: Host removed}

@@ -78,55 +78,51 @@ The application uses an **Agent/Connector** pattern:
 
 The backend exposes a RESTful API. All endpoints are prefixed with `/api`.
 
-### Generic Resources
--   `GET /api/schemas`: Retrieve all loaded JSON schemas.
+All configuration and system endpoints respect the `X-Target-Host` header (or `?host=` query parameter) to target a specific remote host. If omitted, the local system is used.
+
+Configurations submitted via `POST` and `PUT` are validated against the JSON Schema for the target systemd version before being written.
+
+### Schemas & Preferences
+
+-   `GET /api/schemas`: Retrieve all loaded JSON schemas (network, netdev, link, networkd-conf).
 -   `GET /api/view-config`: Get current UI view preferences.
 
-### Network Configuration
-These endpoints respect the `X-Target-Host` header to target a specific remote host.
+### Configuration Files
 
--   **Virtual Devices (.netdev)**:
-    -   `GET /api/netdevs`: List all netdev files.
-    -   `POST /api/netdevs`: Create a new netdev file.
-    -   `GET /api/netdevs/{filename}`: Unused (alias for generic config retrieval).
-    -   `DELETE /api/netdevs/{filename}`: Delete a netdev file.
+Each configuration type (`.network`, `.netdev`, `.link`) follows the same CRUD pattern:
 
--   **Networks (.network)**:
-    -   `GET /api/networks`: List all network files.
-    -   `POST /api/networks`: Create a new network file.
-    -   `GET /api/networks/{filename}`: Unused (alias for generic config retrieval).
-    -   `DELETE /api/networks/{filename}`: Delete a network file.
+| Method   | Endpoint                     | Description                                                                                                                      |
+| -------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/networks`              | List `.network` files with parsed summaries (DHCP, addresses, DNS). Supports `?name=`, `?macaddress=`, `?type=` filters.         |
+| `POST`   | `/api/networks`              | Create a new `.network` file. Body: `{ "filename": "...", "config": { ... } }`                                                   |
+| `GET`    | `/api/networks/{filename}`   | Read and parse a specific `.network` file, returning JSON.                                                                       |
+| `PUT`    | `/api/networks/{filename}`   | Update an existing `.network` file. Body: `{ "config": { ... } }`                                                                |
+| `DELETE` | `/api/networks/{filename}`   | Delete a `.network` file.                                                                                                        |
 
--   **Links (.link)**:
-    -   `GET /api/links`: List all link files (and runtime links).
-    -   `POST /api/links`: Create a new link file.
-    -   `GET /api/links/{filename}`: Unused (alias for generic config retrieval).
-    -   `DELETE /api/links/{filename}`: Delete a link file.
-
--   **File Content**:
-    -   `GET /api/{type}/{filename}`: Retrieve parsed content of a specific file (where type is `netdevs`, `networks`, or `links`).
+The same pattern applies to `/api/netdevs` (`.netdev` files) and `/api/links` (`.link` files).
 
 ### System Management
-System operations also respect the `X-Target-Host` header.
 
--   `GET /api/system/status`: Get systemd-networkd status and version.
--   `GET /api/system/config`: Get global networkd.conf.
--   `POST /api/system/config`: Save global networkd.conf.
--   `GET /api/system/view-config`: Get system-level view config.
--   `POST /api/system/view-config`: Save system-level view config.
--   `POST /api/system/reload`: Reload the networkd daemon.
--   `GET /api/system/reconfigure`: Trigger reconfiguration (GET is supported but POST preferred).
--   `POST /api/system/reconfigure`: Trigger reconfiguration for specific interfaces.
--   `GET /api/system/ssh-key`: Get the backend's public SSH key for remote setup.
--   `GET /api/system/routes`: List current network routes.
--   `GET /api/system/logs`: Fetch recent networkd logs.
+| Method     | Endpoint                     | Description                                                                                  |
+| ---------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `GET`      | `/api/system/status`         | System info: detected systemd version, resolved schema version, runtime interfaces.          |
+| `GET`      | `/api/system/config`         | Read global `networkd.conf`.                                                                 |
+| `POST`     | `/api/system/config`         | Save global `networkd.conf`. Body: `{ "content": "..." }`                                    |
+| `GET`      | `/api/system/view-config`    | Get UI layout preferences.                                                                   |
+| `POST`     | `/api/system/view-config`    | Save UI layout preferences.                                                                  |
+| `POST`     | `/api/system/reload`         | Reload systemd-networkd.                                                                     |
+| `GET/POST` | `/api/system/reconfigure`    | Trigger `networkctl reconfigure`. POST body: `{ "interfaces": ["eth0"] }`                    |
+| `GET`      | `/api/system/ssh-key`        | Get the backend's public SSH key for remote host setup.                                      |
+| `GET`      | `/api/system/routes`         | Current routes and routing policy rules.                                                     |
+| `GET`      | `/api/system/logs`           | Recent systemd-networkd journal entries.                                                     |
 
 ### Host Management
-Endpoints for managing the registry of remote hosts.
 
--   `GET /api/system/hosts`: List all registered hosts.
--   `POST /api/system/hosts`: Register a new host.
--   `DELETE /api/system/hosts/{name}`: Deregister a host.
+| Method   | Endpoint                     | Description                                                                                  |
+| -------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/system/hosts`          | List all registered remote hosts.                                                            |
+| `POST`   | `/api/system/hosts`          | Register a new host. Body: `{ "name": "...", "host": "...", "user": "...", "port": 22 }`     |
+| `DELETE` | `/api/system/hosts/{name}`   | Deregister a remote host.                                                                    |
 
 ## Production Deployment
 

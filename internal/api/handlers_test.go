@@ -24,8 +24,9 @@ func setupTestService(t *testing.T) (*service.NetworkdService, string) {
 	// Manually inject dummy schemas
 	if svc.Schema == nil {
 		svc.Schema = &service.SchemaService{
-			Schemas:   make(map[string]map[string]interface{}),
-			TypeCache: make(map[string]map[string]map[string]service.TypeInfo),
+			Schemas:            make(map[string]map[string]interface{}),
+			TypeCache:          make(map[string]map[string]map[string]service.TypeInfo),
+			RepeatableSections: make(map[string]map[string]bool),
 		}
 	}
 

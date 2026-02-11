@@ -162,6 +162,62 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, suffix, c
 	json.NewEncoder(w).Encode(map[string]string{"message": "Configuration created"})
 }
 
+// UpdateNetwork handles PUT /api/networks/{filename}
+func (h *Handler) UpdateNetwork(w http.ResponseWriter, r *http.Request) {
+	h.handleUpdate(w, r, "network")
+}
+
+// UpdateLink handles PUT /api/links/{filename}
+func (h *Handler) UpdateLink(w http.ResponseWriter, r *http.Request) {
+	h.handleUpdate(w, r, "link")
+}
+
+// UpdateNetDev handles PUT /api/netdevs/{filename}
+func (h *Handler) UpdateNetDev(w http.ResponseWriter, r *http.Request) {
+	h.handleUpdate(w, r, "netdev")
+}
+
+func (h *Handler) handleUpdate(w http.ResponseWriter, r *http.Request, configType string) {
+	filename := chi.URLParam(r, "filename")
+
+	// Verify file exists
+	if _, err := h.Service.ReadNetworkFile(getHost(r), filename); err != nil {
+		http.Error(w, "File not found: "+filename, http.StatusNotFound)
+		return
+	}
+
+	var req struct {
+		Config map[string]interface{} `json:"config"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Config == nil {
+		http.Error(w, "Config is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.Schema.Validate(configType, req.Config); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	content, err := service.MapToINI(req.Config, h.Service.Schema, configType)
+	if err != nil {
+		http.Error(w, "Conversion failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.WriteNetworkFile(getHost(r), filename, content); err != nil {
+		http.Error(w, "Failed to write file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Configuration updated"})
+}
+
 func (h *Handler) DeleteNetwork(w http.ResponseWriter, r *http.Request) {
 	filename := chi.URLParam(r, "filename")
 	if err := h.Service.DeleteNetworkFile(getHost(r), filename); err != nil {
@@ -293,7 +349,8 @@ func (h *Handler) GetViewConfig(w http.ResponseWriter, r *http.Request) {
 	config, err := h.Service.GetViewConfig()
 	if err != nil {
 		if os.IsNotExist(err) {
-			http.Error(w, "View config not found", http.StatusNotFound)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("{}"))
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
