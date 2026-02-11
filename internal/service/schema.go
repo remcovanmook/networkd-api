@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 type TypeInfo struct {
@@ -25,8 +27,14 @@ type SchemaService struct {
 	LoadedVersion     string // The schema version used (e.g., "v257")
 	AvailableVersions []int
 	Schemas           map[string]map[string]interface{}
-	// Cache for type info: Section -> Key -> TypeInfo
+	// Cache for type info: configType -> Section -> Key -> TypeInfo
 	TypeCache map[string]map[string]map[string]TypeInfo
+	// Sections that can appear multiple times (e.g. Address, Route)
+	// Derived from schema oneOf [array, object] pattern
+	// configType -> set of section names
+	RepeatableSections map[string]map[string]bool
+	// Compiled JSON Schema validators for full validation
+	Validators map[string]*jsonschema.Schema
 }
 
 func NewSchemaService(baseSchemaDir string) (*SchemaService, error) {
@@ -92,25 +100,21 @@ func NewSchemaService(baseSchemaDir string) (*SchemaService, error) {
 		RealVersion:       realVersionStr,
 		LoadedVersion:     selectedVersionStr,
 		AvailableVersions: availableVersions,
-		Schemas:           make(map[string]map[string]interface{}),
-		TypeCache:         make(map[string]map[string]map[string]TypeInfo),
+		Schemas:            make(map[string]map[string]interface{}),
+		TypeCache:          make(map[string]map[string]map[string]TypeInfo),
+		RepeatableSections: make(map[string]map[string]bool),
+		Validators:         make(map[string]*jsonschema.Schema),
 	}
 
 	fmt.Printf("Systemd Version: %s, Selected Schema: %s\n", realVersionStr, selectedVersionStr)
 
-	files := []string{"systemd.network.schema.json", "systemd.netdev.schema.json", "systemd.link.schema.json"}
-	for _, file := range files {
-		configType := strings.TrimSuffix(strings.TrimSuffix(file, ".schema.json"), "systemd.")
-		// "systemd.network.schema.json" -> "network"
-		// "systemd.netdev.schema.json" -> "netdev"
-		// "systemd.link.schema.json" -> "link"
-		if strings.HasPrefix(file, "systemd.netdev") {
-			configType = "netdev"
-		} else if strings.HasPrefix(file, "systemd.network") {
-			configType = "network"
-		} else if strings.HasPrefix(file, "systemd.link") {
-			configType = "link"
-		}
+	schemaFiles := map[string]string{
+		"systemd.network.schema.json":       "network",
+		"systemd.netdev.schema.json":        "netdev",
+		"systemd.link.schema.json":          "link",
+		"systemd.networkd.conf.schema.json": "networkd-conf",
+	}
+	for file, configType := range schemaFiles {
 
 		schemaPath := filepath.Join(s.SchemaDir, file)
 		content, err := os.ReadFile(schemaPath)
@@ -125,6 +129,19 @@ func NewSchemaService(baseSchemaDir string) (*SchemaService, error) {
 		}
 		s.Schemas[configType] = schemaMap
 		s.buildTypeCache(configType, schemaMap)
+
+		// Compile JSON Schema validator
+		c := jsonschema.NewCompiler()
+		if err := c.AddResource(file, schemaMap); err != nil {
+			fmt.Printf("Warning: Failed to add schema resource %s: %v\n", file, err)
+			continue
+		}
+		compiled, err := c.Compile(file)
+		if err != nil {
+			fmt.Printf("Warning: Failed to compile schema %s: %v\n", file, err)
+			continue
+		}
+		s.Validators[configType] = compiled
 	}
 
 	return s, nil
@@ -133,6 +150,9 @@ func NewSchemaService(baseSchemaDir string) (*SchemaService, error) {
 func (s *SchemaService) buildTypeCache(configType string, schema map[string]interface{}) {
 	if s.TypeCache[configType] == nil {
 		s.TypeCache[configType] = make(map[string]map[string]TypeInfo)
+	}
+	if s.RepeatableSections[configType] == nil {
+		s.RepeatableSections[configType] = make(map[string]bool)
 	}
 
 	definitions := schema["definitions"].(map[string]interface{})
@@ -144,11 +164,21 @@ func (s *SchemaService) buildTypeCache(configType string, schema map[string]inte
 			continue
 		}
 
-		// Handle "oneOf" which might contain the actual object definition or array wrapper
-		// Also handle standard object definition
+		// Detect repeatable sections: oneOf with an array option
+		if oneOf, ok := sectionDef["oneOf"].([]interface{}); ok {
+			for _, v := range oneOf {
+				if opt, ok := v.(map[string]interface{}); ok {
+					if opt["type"] == "array" {
+						s.RepeatableSections[configType][sectionName] = true
+						break
+					}
+				}
+			}
+		}
+
+		// Find the object properties within this section definition
 		var objectProps map[string]interface{}
 
-		// Helper to find properties in a schema node
 		var findProps func(node map[string]interface{}) map[string]interface{}
 		findProps = func(node map[string]interface{}) map[string]interface{} {
 			if props, ok := node["properties"].(map[string]interface{}); ok {
@@ -235,24 +265,28 @@ func (s *SchemaService) resolveType(propDef map[string]interface{}, definitions 
 }
 
 func (s *SchemaService) Validate(configType string, data map[string]interface{}) error {
-	// Lightweight validation: check if sections exist
-	// In the future, we can expand this to check types using s.TypeCache
-
-	// Check if we have the schema
 	if _, ok := s.Schemas[configType]; !ok {
 		return fmt.Errorf("unknown config type: %s", configType)
 	}
 
-	for sectionName := range data {
-		// Verify section exists in TypeCache (which represents valid sections)
-		if _, ok := s.TypeCache[configType][sectionName]; !ok {
-			// Ignore unknown sections or warn?
-			// Systemd ignores unknown sections, but strict mode might want to flag.
-			// For now allow it.
-		}
+	validator, ok := s.Validators[configType]
+	if !ok {
+		// No compiled validator (schema failed to compile) — skip validation
+		return nil
 	}
 
-	return nil
+	// jsonschema expects the data to go through JSON round-trip so that
+	// numeric types match what the schema expects (e.g. float64 from JSON).
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	var normalized interface{}
+	if err := json.Unmarshal(raw, &normalized); err != nil {
+		return fmt.Errorf("failed to normalize config: %w", err)
+	}
+
+	return validator.Validate(normalized)
 }
 
 func (s *SchemaService) ResolveSchemaVersion(targetVersionStr string) string {
@@ -289,6 +323,13 @@ func (s *SchemaService) ResolveSchemaVersion(targetVersionStr string) string {
 		}
 	}
 	return fmt.Sprintf("v%d", selected)
+}
+
+func (s *SchemaService) IsRepeatableSection(configType, section string) bool {
+	if sections, ok := s.RepeatableSections[configType]; ok {
+		return sections[section]
+	}
+	return false
 }
 
 func (s *SchemaService) GetTypeInfo(configType, section, key string) TypeInfo {

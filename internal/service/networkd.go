@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 type Link struct {
@@ -84,7 +85,12 @@ func NewNetworkdService(configDir, dataDir string) *NetworkdService {
 	if err != nil {
 		fmt.Printf("Warning: Failed to initialize SchemaService: %v. Validation will be limited.\n", err)
 		// We can still proceed but maybe with empty schemas?
-		sService = &SchemaService{Schemas: make(map[string]map[string]interface{}), TypeCache: make(map[string]map[string]map[string]TypeInfo)}
+		sService = &SchemaService{
+			Schemas:            make(map[string]map[string]interface{}),
+			TypeCache:          make(map[string]map[string]map[string]TypeInfo),
+			RepeatableSections: make(map[string]map[string]bool),
+			Validators:         make(map[string]*jsonschema.Schema),
+		}
 	} else {
 		fmt.Printf("Initialized SchemaService: Systemd=%s, Schema=%s\n", sService.RealVersion, sService.LoadedVersion)
 	}
@@ -403,7 +409,7 @@ func (s *NetworkdService) GetSystemdVersion(host string) (string, error) {
 }
 
 func (s *NetworkdService) GetViewConfig() ([]byte, error) {
-	path := filepath.Join(s.DataDir, ".schema-config.json")
+	path := filepath.Join(s.DataDir, "frontend-prefs.json")
 	return os.ReadFile(path)
 }
 
@@ -411,7 +417,7 @@ func (s *NetworkdService) SaveViewConfig(content []byte) error {
 	if !json.Valid(content) {
 		return fmt.Errorf("invalid json")
 	}
-	path := filepath.Join(s.DataDir, ".schema-config.json")
+	path := filepath.Join(s.DataDir, "frontend-prefs.json")
 	return os.WriteFile(path, content, 0644)
 }
 

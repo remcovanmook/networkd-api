@@ -14,6 +14,7 @@ func NewRouter(h *Handler, staticDir string) http.Handler {
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.Compress(5, "application/json", "text/html", "text/css", "application/javascript"))
 
 	// Basic CORS setup
 	r.Use(cors.Handler(cors.Options{
@@ -33,18 +34,21 @@ func NewRouter(h *Handler, staticDir string) http.Handler {
 		r.Get("/netdevs", h.ListNetDevs)
 		r.Post("/netdevs", h.CreateNetDev)
 		r.Get("/netdevs/{filename}", h.GetNetworkConfig)
+		r.Put("/netdevs/{filename}", h.UpdateNetDev)
 		r.Delete("/netdevs/{filename}", h.DeleteNetwork)
 
 		// Networks (.network)
 		r.Get("/networks", h.ListNetworks)
 		r.Post("/networks", h.CreateNetwork)
 		r.Get("/networks/{filename}", h.GetNetworkConfig)
+		r.Put("/networks/{filename}", h.UpdateNetwork)
 		r.Delete("/networks/{filename}", h.DeleteNetwork)
 
 		// Links (.link)
 		r.Get("/links", h.ListLinks)
 		r.Post("/links", h.CreateLink)
 		r.Get("/links/{filename}", h.GetNetworkConfig)
+		r.Put("/links/{filename}", h.UpdateLink)
 		r.Delete("/links/{filename}", h.DeleteNetwork)
 
 		// System Management
@@ -77,8 +81,7 @@ func NewRouter(h *Handler, staticDir string) http.Handler {
 			fullPath := staticDir + path
 
 			// If it's a file that exists, serve it
-			if info, err := // Wait, I need os package
-				os.Stat(fullPath); err == nil && !info.IsDir() {
+			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
 				fs.ServeHTTP(w, r)
 				return
 			}

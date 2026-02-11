@@ -131,12 +131,8 @@ func INIToMap(content string, schemaService *SchemaService, configType string) (
 				result[sectionName] = []interface{}{existing, sectionMap}
 			}
 		} else {
-			// Check if it SHOULD be a list even if singular?
-			// For now, store as object. If we need strict arrays for some sections (Address, Route),
-			// we might need a list of "MultipleSections" in SchemaService.
-			// Known multiples: Address, Route, Rule, ...
-			isKnownMultiple := sectionName == "Address" || sectionName == "Route" || sectionName == "RoutingPolicyRule"
-			if isKnownMultiple {
+			// Check if this section can appear multiple times according to the schema
+			if schemaService.IsRepeatableSection(configType, sectionName) {
 				result[sectionName] = []interface{}{sectionMap}
 			} else {
 				result[sectionName] = sectionMap
