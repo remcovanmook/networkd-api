@@ -1,14 +1,15 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
-import { processSchema, type SchemaMap, COMMON_NETDEV_KINDS, NETDEV_KINDS } from '../utils/schemaProcessor';
+import { processSchema, extractNetdevKinds, type SchemaMap, type NetDevKindInfo } from '../utils/schemaProcessor';
 import { useHost } from './HostContext';
 
 interface SchemaContextType {
     networkSections: SchemaMap | null;
     netdevSections: SchemaMap | null;
     linkSections: SchemaMap | null;
-    systemdVersion: string; // Internal Logic Version (Schema Version)
-    realSystemdVersion: string; // Display Version (Actual Host Version)
+    networkdConfSections: SchemaMap | null;
+    systemdVersion: string;
+    realSystemdVersion: string;
     loading: boolean;
     error: string | null;
     commonNetDevKinds: string[];
@@ -19,22 +20,25 @@ const SchemaContext = createContext<SchemaContextType>({
     networkSections: null,
     netdevSections: null,
     linkSections: null,
+    networkdConfSections: null,
     systemdVersion: '',
     realSystemdVersion: '',
     loading: true,
     error: null,
-    commonNetDevKinds: COMMON_NETDEV_KINDS,
-    netdevKinds: NETDEV_KINDS,
+    commonNetDevKinds: [],
+    netdevKinds: {},
 });
 
 export const SchemaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [networkSections, setNetworkSections] = useState<SchemaMap | null>(null);
     const [netdevSections, setNetDevSections] = useState<SchemaMap | null>(null);
     const [linkSections, setLinkSections] = useState<SchemaMap | null>(null);
+    const [networkdConfSections, setNetworkdConfSections] = useState<SchemaMap | null>(null);
     const [systemdVersion, setSystemdVersion] = useState<string>('');
     const [realSystemdVersion, setRealSystemdVersion] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [kindInfo, setKindInfo] = useState<NetDevKindInfo>({ kindSections: {}, commonKinds: [] });
 
     const { currentHost } = useHost();
 
@@ -42,26 +46,29 @@ export const SchemaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const fetchSchemas = async () => {
             setLoading(true);
             try {
-                // Get Version
                 const infoRes = await axios.get('/api/system/status');
                 const realVer = infoRes.data.systemd_version || 'unknown';
-                const schemaVer = infoRes.data.schema_version || realVer; // Fallback to real if missing
+                const schemaVer = infoRes.data.schema_version || realVer;
 
                 setRealSystemdVersion(realVer);
-                setSystemdVersion(schemaVer); // Logic uses schema version
+                setSystemdVersion(schemaVer);
 
-                // Get Schemas
                 const schemaRes = await axios.get('/api/schemas');
                 const rawSchemas = schemaRes.data;
+                const ver = parseVersion(realVer);
 
                 if (rawSchemas.network) {
-                    setNetworkSections(processSchema(rawSchemas.network, parseVersion(realVer)));
+                    setNetworkSections(processSchema(rawSchemas.network, ver));
                 }
                 if (rawSchemas.netdev) {
-                    setNetDevSections(processSchema(rawSchemas.netdev, parseVersion(realVer)));
+                    setNetDevSections(processSchema(rawSchemas.netdev, ver));
+                    setKindInfo(extractNetdevKinds(rawSchemas.netdev));
                 }
                 if (rawSchemas.link) {
-                    setLinkSections(processSchema(rawSchemas.link, parseVersion(realVer)));
+                    setLinkSections(processSchema(rawSchemas.link, ver));
+                }
+                if (rawSchemas['networkd-conf']) {
+                    setNetworkdConfSections(processSchema(rawSchemas['networkd-conf'], ver));
                 }
                 setError(null);
             } catch (err: any) {
@@ -80,12 +87,13 @@ export const SchemaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             networkSections,
             netdevSections,
             linkSections,
+            networkdConfSections,
             systemdVersion,
             realSystemdVersion,
             loading,
             error,
-            commonNetDevKinds: COMMON_NETDEV_KINDS,
-            netdevKinds: NETDEV_KINDS
+            commonNetDevKinds: kindInfo.commonKinds,
+            netdevKinds: kindInfo.kindSections
         }}>
             {children}
         </SchemaContext.Provider>

@@ -53,7 +53,7 @@ func NewRouter(h *Handler, staticDir string) http.Handler {
 		// System Management
 		r.Get("/system/status", h.GetSystemStatus)
 		r.Get("/system/config", h.GetGlobalConfig)
-		r.Post("/system/config", h.SaveGlobalConfig)
+		r.Put("/system/config", h.SaveGlobalConfig)
 		r.Post("/system/reload", h.ReloadNetworkd)
 		r.Get("/system/reconfigure", h.ReconfigureSystem)
 		r.Post("/system/reconfigure", h.ReconfigureSystem)

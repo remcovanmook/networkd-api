@@ -16,6 +16,10 @@ import (
 type Link struct {
 	Index            int      `json:"index"`
 	Name             string   `json:"name"`
+	Type             string   `json:"type,omitempty"`
+	Driver           string   `json:"driver,omitempty"`
+	HardwareAddress  string   `json:"hardware_address,omitempty"`
+	Path             string   `json:"path,omitempty"`
 	OperationalState string   `json:"operational_state"`
 	NetworkFile      string   `json:"network_file"`
 	Addresses        []string `json:"addresses"`

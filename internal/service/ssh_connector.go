@@ -40,6 +40,14 @@ func NewSSHConnector(host string, port int, user, keyFile string) *SSHConnector 
 	}
 }
 
+// sudoPrefix returns "sudo " when the SSH user is not root, empty string otherwise.
+func (c *SSHConnector) sudoPrefix() string {
+	if c.User == "root" {
+		return ""
+	}
+	return "sudo "
+}
+
 func (c *SSHConnector) connect() error {
 	if c.Client != nil && c.SFTP != nil {
 		return nil // Already connected (todo: check liveness)
@@ -125,7 +133,7 @@ func (c *SSHConnector) ReadConfigFile(filename string) ([]byte, error) {
 	defer session.Close()
 
 	remotePath := filepath.Join(c.ConfigDir, filename)
-	cmd := fmt.Sprintf("sudo cat -- %s", shellQuote(remotePath))
+	cmd := fmt.Sprintf("%scat %s", c.sudoPrefix(), shellQuote(remotePath))
 	return session.Output(cmd)
 }
 
@@ -139,10 +147,16 @@ func (c *SSHConnector) WriteConfigFile(filename string, content []byte) error {
 	}
 	defer session.Close()
 
+	var stderr bytes.Buffer
 	session.Stdin = bytes.NewReader(content)
+	session.Stderr = &stderr
 	remotePath := filepath.Join(c.ConfigDir, filename)
-	cmd := fmt.Sprintf("sudo tee -- %s > /dev/null", shellQuote(remotePath))
+	cmd := fmt.Sprintf("%stee %s > /dev/null", c.sudoPrefix(), shellQuote(remotePath))
 	if err := session.Run(cmd); err != nil {
+		errMsg := strings.TrimSpace(stderr.String())
+		if errMsg != "" {
+			return fmt.Errorf("failed to write file: %s", errMsg)
+		}
 		return fmt.Errorf("failed to write file: %v", err)
 	}
 	return nil
@@ -159,7 +173,7 @@ func (c *SSHConnector) DeleteConfigFile(filename string) error {
 	defer session.Close()
 
 	remotePath := filepath.Join(c.ConfigDir, filename)
-	cmd := fmt.Sprintf("sudo rm -- %s", shellQuote(remotePath))
+	cmd := fmt.Sprintf("%srm %s", c.sudoPrefix(), shellQuote(remotePath))
 	return session.Run(cmd)
 }
 
@@ -173,7 +187,7 @@ func (c *SSHConnector) Reconfigure(devices []string) error {
 	}
 	defer session.Close()
 
-	cmd := "sudo networkctl reconfigure"
+	cmd := c.sudoPrefix() + "networkctl reconfigure"
 	if len(devices) > 0 {
 		for _, d := range devices {
 			cmd += " " + shellQuote(d)
@@ -192,6 +206,13 @@ type networkctlLink struct {
 	Name             string `json:"Name"`
 	OperationalState string `json:"OperationalState"`
 	NetworkFile      string `json:"NetworkFile"`
+}
+
+type networkctlStatus struct {
+	Type            string `json:"Type"`
+	Driver          string `json:"Driver"`
+	HardwareAddress string `json:"HardwareAddress"`
+	Path            string `json:"Path"`
 }
 
 type ipAddress struct {
@@ -272,24 +293,50 @@ func (c *SSHConnector) GetLinks() ([]Link, error) {
 	// 2. Fetch Addresses via ip -j addr
 	session, err = c.Client.NewSession()
 	if err == nil {
-		defer session.Close()
 		ipOut, err := session.Output("ip -j addr")
+		session.Close()
 		if err == nil {
 			var ipAddrs []ipAddress
 			if err := json.Unmarshal(ipOut, &ipAddrs); err == nil {
-				// Map addresses to links
 				addrMap := make(map[int][]string)
 				for _, ip := range ipAddrs {
 					for _, info := range ip.AddrInfo {
 						addrMap[ip.IfIndex] = append(addrMap[ip.IfIndex], info.Local)
 					}
 				}
-				// Merge into links
 				for i := range links {
 					if addrs, ok := addrMap[links[i].Index]; ok {
 						links[i].Addresses = addrs
 					}
 				}
+			}
+		}
+	}
+
+	// 3. Enrich with networkctl status per interface (MAC, type, driver, path)
+	for i := range links {
+		session, err = c.Client.NewSession()
+		if err != nil {
+			continue
+		}
+		out, err := session.Output("networkctl --json=short status " + shellQuote(links[i].Name))
+		session.Close()
+		if err != nil {
+			continue
+		}
+		var status networkctlStatus
+		if json.Unmarshal(out, &status) == nil {
+			if status.Type != "" {
+				links[i].Type = status.Type
+			}
+			if status.Driver != "" {
+				links[i].Driver = status.Driver
+			}
+			if status.HardwareAddress != "" {
+				links[i].HardwareAddress = status.HardwareAddress
+			}
+			if status.Path != "" {
+				links[i].Path = status.Path
 			}
 		}
 	}
@@ -324,7 +371,7 @@ func (c *SSHConnector) GetGlobalConfig() (string, error) {
 	}
 	defer session.Close()
 
-	out, err := session.Output("sudo cat /etc/systemd/networkd.conf")
+	out, err := session.Output(c.sudoPrefix() + "cat /etc/systemd/networkd.conf")
 	if err != nil {
 		return "", err
 	}

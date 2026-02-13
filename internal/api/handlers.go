@@ -2,12 +2,36 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"networkd-api/internal/service"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
+
+// sanitizeFilename validates that a filename is safe: no path separators,
+// no path traversal, and no hidden files.
+func sanitizeFilename(name string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("filename is required")
+	}
+	// Reject if contains directory separators (path traversal attempt)
+	if strings.ContainsAny(name, "/\\") {
+		return "", fmt.Errorf("invalid filename: must not contain path separators")
+	}
+	// Reject null bytes
+	if strings.ContainsRune(name, 0) {
+		return "", fmt.Errorf("invalid filename: contains null bytes")
+	}
+	clean := filepath.Base(name)
+	// Reject . / .. / hidden files
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".") {
+		return "", fmt.Errorf("invalid filename")
+	}
+	return clean, nil
+}
 
 type Handler struct {
 	Service *service.NetworkdService
@@ -77,7 +101,11 @@ func (h *Handler) ListLinks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
-	filename := chi.URLParam(r, "filename")
+	filename, err := sanitizeFilename(chi.URLParam(r, "filename"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	content, err := h.Service.ReadNetworkFile(getHost(r), filename)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -136,6 +164,13 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request, suffix, c
 	if !strings.HasSuffix(req.Filename, suffix) {
 		req.Filename += suffix
 	}
+	// Sanitize filename to prevent path traversal
+	cleanName, err := sanitizeFilename(req.Filename)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	req.Filename = cleanName
 
 	// Validate against Schema
 	if err := h.Service.Schema.Validate(configType, req.Config); err != nil {
@@ -176,7 +211,11 @@ func (h *Handler) UpdateNetDev(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleUpdate(w http.ResponseWriter, r *http.Request, configType string) {
-	filename := chi.URLParam(r, "filename")
+	filename, err := sanitizeFilename(chi.URLParam(r, "filename"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// Verify file exists
 	if _, err := h.Service.ReadNetworkFile(getHost(r), filename); err != nil {
@@ -217,7 +256,11 @@ func (h *Handler) handleUpdate(w http.ResponseWriter, r *http.Request, configTyp
 }
 
 func (h *Handler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
-	filename := chi.URLParam(r, "filename")
+	filename, err := sanitizeFilename(chi.URLParam(r, "filename"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if err := h.Service.DeleteNetworkFile(getHost(r), filename); err != nil {
 		http.Error(w, "Failed to delete file: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -336,10 +379,10 @@ func (h *Handler) GetPublicSSHKey(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(key))
 }
 
-// GetSchemas returns the loaded JSON schemas
+// GetSchemas returns the loaded JSON schemas with original key ordering preserved
 func (h *Handler) GetSchemas(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(h.Service.Schema.Schemas)
+	json.NewEncoder(w).Encode(h.Service.Schema.RawSchemas)
 }
 
 func getHost(r *http.Request) string {

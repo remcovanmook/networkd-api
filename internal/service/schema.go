@@ -27,6 +27,8 @@ type SchemaService struct {
 	LoadedVersion     string // The schema version used (e.g., "v257")
 	AvailableVersions []int
 	Schemas           map[string]map[string]interface{}
+	// Raw JSON bytes for each schema — preserves key ordering from the original files
+	RawSchemas map[string]json.RawMessage
 	// Cache for type info: configType -> Section -> Key -> TypeInfo
 	TypeCache map[string]map[string]map[string]TypeInfo
 	// Sections that can appear multiple times (e.g. Address, Route)
@@ -101,6 +103,7 @@ func NewSchemaService(baseSchemaDir string) (*SchemaService, error) {
 		LoadedVersion:     selectedVersionStr,
 		AvailableVersions: availableVersions,
 		Schemas:            make(map[string]map[string]interface{}),
+		RawSchemas:         make(map[string]json.RawMessage),
 		TypeCache:          make(map[string]map[string]map[string]TypeInfo),
 		RepeatableSections: make(map[string]map[string]bool),
 		Validators:         make(map[string]*jsonschema.Schema),
@@ -128,6 +131,7 @@ func NewSchemaService(baseSchemaDir string) (*SchemaService, error) {
 			return nil, fmt.Errorf("failed to parse schema %s: %w", file, err)
 		}
 		s.Schemas[configType] = schemaMap
+		s.RawSchemas[configType] = json.RawMessage(content)
 		s.buildTypeCache(configType, schemaMap)
 
 		// Compile JSON Schema validator

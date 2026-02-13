@@ -3,33 +3,59 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"networkd-api/internal/service"
 )
 
 func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 	content, err := h.Service.GetGlobalConfig(getHost(r))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// File doesn't exist or is empty — return empty config
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{})
 		return
 	}
-	// Return raw text or JSON wrapper?
-	// JSON wrapper is safer for future expansion.
-	json.NewEncoder(w).Encode(map[string]string{"content": content})
+
+	config, err := service.INIToMap(content, h.Service.Schema, "networkd-conf")
+	if err != nil {
+		http.Error(w, "Failed to parse config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(config)
 }
 
 func (h *Handler) SaveGlobalConfig(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Content string `json:"content"`
+	var req struct {
+		Config map[string]interface{} `json:"config"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
+	if req.Config == nil {
+		http.Error(w, "Config is required", http.StatusBadRequest)
+		return
+	}
 
-	if err := h.Service.SaveGlobalConfig(getHost(r), body.Content); err != nil {
+	if err := h.Service.Schema.Validate("networkd-conf", req.Config); err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	content, err := service.MapToINI(req.Config, h.Service.Schema, "networkd-conf")
+	if err != nil {
+		http.Error(w, "Conversion failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.SaveGlobalConfig(getHost(r), content); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Configuration saved"})
 }
 
 func (h *Handler) ReloadNetworkd(w http.ResponseWriter, r *http.Request) {

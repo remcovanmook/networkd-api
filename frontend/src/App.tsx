@@ -6,12 +6,9 @@ import { ToastProvider } from './components/ToastContext';
 import { HostProvider } from './contexts/HostContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import EditNetwork from './pages/EditNetwork';
-import EditLink from './pages/EditLink';
-import EditNetDev from './pages/EditNetDev';
+import ConfigEditor from './pages/ConfigEditor';
 import SystemPage from './pages/SystemPage';
 import ApiDocs from './pages/ApiDocs';
-import SchemaEditor from './pages/SchemaEditor';
 import WelcomePage from './pages/WelcomePage';
 import HostManagementPage from './pages/HostManagementPage';
 
@@ -21,7 +18,7 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <HostProvider> {/* Added HostProvider */}
+        <HostProvider>
           <SchemaProvider>
             <BrowserRouter>
               <Routes>
@@ -29,25 +26,23 @@ const App: React.FC = () => {
                   <Route index element={<WelcomePage />} />
                   <Route path="configuration" element={<Dashboard />} />
 
-                  {/* Specific Editors */}
-                  <Route path="link/new" element={<EditLink />} />
-                  <Route path="link/:filename" element={<EditLink />} />
+                  <Route path="network/new" element={<ConfigEditor configType="network" />} />
+                  <Route path="network/:filename" element={<ConfigEditor configType="network" />} />
 
-                  <Route path="netdev/new" element={<EditNetDev />} />
-                  <Route path="netdev/:filename" element={<EditNetDev />} />
+                  <Route path="netdev/new" element={<ConfigEditor configType="netdev" />} />
+                  <Route path="netdev/:filename" element={<ConfigEditor configType="netdev" />} />
 
-                  <Route path="network/new" element={<EditNetwork />} />
-                  <Route path="network/:filename" element={<EditNetwork />} />
+                  <Route path="link/new" element={<ConfigEditor configType="link" />} />
+                  <Route path="link/:filename" element={<ConfigEditor configType="link" />} />
 
                   <Route path="system" element={<SystemPage />} />
                   <Route path="hosts" element={<HostManagementPage />} />
-                  <Route path="preferences" element={<SchemaEditor />} />
                   <Route path="api-docs" element={<ApiDocs />} />
                 </Route>
               </Routes>
             </BrowserRouter>
           </SchemaProvider>
-        </HostProvider> {/* Closed HostProvider */}
+        </HostProvider>
       </ToastProvider>
     </QueryClientProvider>
   );
