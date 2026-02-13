@@ -14,6 +14,10 @@ axios.interceptors.request.use((config) => {
 export interface Link {
     index: number;
     name: string;
+    type?: string;
+    driver?: string;
+    hardware_address?: string;
+    path?: string;
     operational_state: string;
     network_file: string;
     addresses?: string[];
@@ -89,6 +93,10 @@ export const apiClient = {
         const response = await axios.post(`${API_Base}/netdevs`, { filename, config });
         return response.data;
     },
+    updateNetDev: async (filename: string, config: NetDevConfig) => {
+        const response = await axios.put(`${API_Base}/netdevs/${filename}`, { config });
+        return response.data;
+    },
     deleteNetDev: async (filename: string) => {
         await axios.delete(`${API_Base}/netdevs/${filename}`);
     },
@@ -102,6 +110,10 @@ export const apiClient = {
         const response = await axios.post(`${API_Base}/networks`, { filename, config });
         return response.data;
     },
+    updateNetwork: async (filename: string, config: NetworkConfig) => {
+        const response = await axios.put(`${API_Base}/networks/${filename}`, { config });
+        return response.data;
+    },
     deleteNetwork: async (filename: string) => {
         await axios.delete(`${API_Base}/networks/${filename}`);
     },
@@ -113,6 +125,10 @@ export const apiClient = {
     },
     createLink: async (filename: string, config: any) => {
         const response = await axios.post(`${API_Base}/links`, { filename, config });
+        return response.data;
+    },
+    updateLink: async (filename: string, config: any) => {
+        const response = await axios.put(`${API_Base}/links/${filename}`, { config });
         return response.data;
     },
     deleteLink: (filename: string) =>
@@ -138,11 +154,11 @@ export const apiClient = {
         return response.data;
     },
     getGlobalConfig: async () => {
-        const response = await axios.get<{ content: string }>(`${API_Base}/system/config`);
+        const response = await axios.get(`${API_Base}/system/config`);
         return response.data;
     },
-    saveGlobalConfig: async (content: string) => {
-        await axios.post(`${API_Base}/system/config`, { content });
+    saveGlobalConfig: async (config: any) => {
+        await axios.put(`${API_Base}/system/config`, { config });
     },
     reloadNetworkd: async () => {
         const response = await axios.post<{ message: string, output: string }>(`${API_Base}/system/reload`);

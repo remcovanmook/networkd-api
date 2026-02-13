@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -61,12 +62,38 @@ func (c *LocalConnector) Reconfigure(devices []string) error {
 	return nil
 }
 
+// enrichLinksWithStatus calls networkctl --json=short status <name> for each link
+// to fill in Type, Driver, HardwareAddress, and Path.
+func enrichLinksWithStatus(links []Link) {
+	for i := range links {
+		out, err := exec.Command("networkctl", "--json=short", "status", links[i].Name).Output()
+		if err != nil {
+			continue
+		}
+		var status networkctlStatus
+		if json.Unmarshal(out, &status) == nil {
+			if status.Type != "" {
+				links[i].Type = status.Type
+			}
+			if status.Driver != "" {
+				links[i].Driver = status.Driver
+			}
+			if status.HardwareAddress != "" {
+				links[i].HardwareAddress = status.HardwareAddress
+			}
+			if status.Path != "" {
+				links[i].Path = status.Path
+			}
+		}
+	}
+}
+
 func (c *LocalConnector) GetLinks() ([]Link, error) {
 	if c.Conn == nil {
 		// Mock/Fallback for MacOS dev
 		return []Link{
-			{Index: 1, Name: "lo", OperationalState: "carrier", NetworkFile: "", Addresses: []string{"127.0.0.1/8", "::1/128"}},
-			{Index: 2, Name: "eth0", OperationalState: "routable", NetworkFile: "10-eth0.network", Addresses: []string{"192.168.1.5/24", "fe80::1/64"}},
+			{Index: 1, Name: "lo", Type: "loopback", OperationalState: "carrier", NetworkFile: "", Addresses: []string{"127.0.0.1/8", "::1/128"}},
+			{Index: 2, Name: "eth0", Type: "ether", HardwareAddress: "52:54:00:12:34:56", Driver: "virtio_net", OperationalState: "routable", NetworkFile: "10-eth0.network", Addresses: []string{"192.168.1.5/24", "fe80::1/64"}},
 		}, nil
 	}
 
@@ -95,10 +122,6 @@ func (c *LocalConnector) GetLinks() ([]Link, error) {
 			Addresses:        []string{},
 		}
 
-		// DBus doesn't give addresses directly in ListLinks, usually separate call or GetLink request.
-		// Original code used net.InterfaceByIndex for local addresses.
-		// For remote, this won't work easily (GetLinks via SSH networkctl list gives some info).
-		// Local connector using `net` package is fine.
 		if iface, err := net.InterfaceByIndex(int(idx)); err == nil {
 			if addrs, err := iface.Addrs(); err == nil {
 				for _, addr := range addrs {
@@ -108,6 +131,10 @@ func (c *LocalConnector) GetLinks() ([]Link, error) {
 		}
 		links = append(links, link)
 	}
+
+	// Enrich with networkctl status per interface
+	enrichLinksWithStatus(links)
+
 	return links, nil
 }
 

@@ -4,7 +4,7 @@ import { FileText } from 'lucide-react';
 import type { ConfigOption } from '../utils/schemaProcessor';
 
 interface LivePreviewProps {
-    type: 'network' | 'netdev' | 'link';
+    type: 'network' | 'netdev' | 'link' | 'networkd-conf';
     config: any;
     sections: Record<string, { options: ConfigOption[], name?: string }>;
     visible?: boolean;

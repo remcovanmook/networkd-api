@@ -2,75 +2,82 @@ import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { type ConfigOption } from '../utils/schemaProcessor';
 
-// Improved validation with OR logic
-const validateInput = (value: string, types: string[]): string | null => {
+// Schema-aware validation
+const validateInput = (value: string, option: ConfigOption): string | null => {
     if (!value) return null;
 
-    // Filter out 'list' as it's a container type
-    const valueTypes = types.filter(t => t !== 'list');
-    if (valueTypes.length === 0) return null; // No specific type constraints
+    const types = (option.types || [option.type]).filter(t => t !== 'list');
+    if (types.length === 0) return null;
 
-    let isValid = false;
+    const v = option.validation;
 
-    for (const type of valueTypes) {
-        if (type === 'string') {
-            isValid = true;
-            break;
+    // For number types, check range from schema
+    if (types.includes('number')) {
+        const num = Number(value);
+        if (!isNaN(num)) {
+            if (v?.minimum !== undefined && num < v.minimum) {
+                return `Minimum: ${v.minimum}`;
+            }
+            if (v?.maximum !== undefined && num > v.maximum) {
+                return `Maximum: ${v.maximum}`;
+            }
+            return null;
         }
+    }
+
+    // For types that also accept strings (bytes, duration), be lenient
+    if (types.includes('bytes')) {
+        if (/^\d+(\s*[KMGTPE]i?)?$/.test(value)) return null;
+    }
+    if (types.includes('duration')) {
+        if (/^\d+(\.\d+)?(us|ms|s|min|h|d|w|M|y)?$/.test(value)) return null;
+    }
+
+    // Schema pattern validation (from the actual JSON schema)
+    if (v?.pattern) {
+        try {
+            if (new RegExp(v.pattern).test(value)) return null;
+        } catch { /* invalid regex, skip */ }
+    }
+
+    // Type-specific format checks (fallback when no schema pattern)
+    let isValid = false;
+    for (const type of types) {
+        if (type === 'string') { isValid = true; break; }
         if (type === 'boolean') {
             if (['yes', 'no', 'true', 'false', '1', '0', 'on', 'off'].includes(value.toLowerCase())) {
-                isValid = true;
-                break;
+                isValid = true; break;
             }
         }
-        if (type === 'ipv4') {
-            // Basic IPv4 (including optional CIDR)
-            if (/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/.test(value)) {
-                isValid = true;
-                break;
-            }
+        if (type === 'number') {
+            if (!isNaN(Number(value))) { isValid = true; break; }
         }
-        if (type === 'ipv6') {
-            // Loose IPv6 regex to catch common errors but allow standard formats
-            if (/^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}(\/\d{1,3})?$/.test(value)) {
-                isValid = true;
-                break;
-            }
+        if (type === 'ipv4' || type === 'ip' || type === 'prefix') {
+            if (/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/.test(value)) { isValid = true; break; }
+        }
+        if (type === 'ipv6' || type === 'ip' || type === 'prefix') {
+            if (/^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}(\/\d{1,3})?$/.test(value)) { isValid = true; break; }
         }
         if (type === 'mac') {
-            if (/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(value)) {
-                isValid = true;
-                break;
-            }
-        }
-        if (type === 'number' || type === 'integer' || type === 'bytes' || type === 'seconds' || type === 'duration') {
-            const num = Number(value);
-            if (!isNaN(num)) {
-                // Check range if specified in type (e.g. "0-65535")
-                isValid = true;
-                break;
-            }
-            // For bytes/seconds, allow suffixes if we want to be linient, but strict schema usually implies number
-            // If type is specifically 'bytes' or 'duration', we might accept strings like '1G' or '5s' which validation above might fail if purely number check
-            if (type === 'bytes' && /^\d+[KMGT]?$/.test(value)) { isValid = true; break; }
-            if (type === 'seconds' || type === 'duration') { isValid = true; break; } // Allow strings for duration
-        }
-
-        // Range check support (e.g. type="0-100")
-        const rangeMatch = type.match(/^(\d+)-(\d+)$/);
-        if (rangeMatch) {
-            const min = parseInt(rangeMatch[1]);
-            const max = parseInt(rangeMatch[2]);
-            const num = Number(value);
-            if (!isNaN(num) && num >= min && num <= max) {
-                isValid = true;
-                break;
+            if (/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(value) ||
+                /^[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}$/.test(value)) {
+                isValid = true; break;
             }
         }
     }
 
-    if (isValid) return null;
-    return `Expected: ${valueTypes.map(getTypeLabel).join(' or ')}`;
+    if (isValid) {
+        // Even if type-valid, check length constraints
+        if (v?.minLength !== undefined && value.length < v.minLength) {
+            return `Minimum length: ${v.minLength}`;
+        }
+        if (v?.maxLength !== undefined && value.length > v.maxLength) {
+            return `Maximum length: ${v.maxLength}`;
+        }
+        return null;
+    }
+
+    return `Expected: ${types.map(getTypeLabel).join(' or ')}`;
 };
 
 const getTypeLabel = (type: string) => {
@@ -79,6 +86,8 @@ const getTypeLabel = (type: string) => {
     if (type === 'integer' || type === 'number') return 'Num';
     if (type === 'ipv4') return 'IPv4';
     if (type === 'ipv6') return 'IPv6';
+    if (type === 'ip') return 'IP';
+    if (type === 'prefix') return 'CIDR';
     if (type === 'mac') return 'MAC';
     if (type === 'seconds' || type === 'duration') return 'Time';
     if (type === 'bytes') return 'Bytes';
@@ -87,21 +96,75 @@ const getTypeLabel = (type: string) => {
 };
 
 const getBadgeColor = (type: string) => {
-    if (type === 'boolean') return '#e8f5e9'; // Green-ish
-    if (type === 'integer' || type === 'number') return '#e3f2fd'; // Blue-ish
-    if (type.startsWith('ipv')) return '#fff3e0'; // Orange-ish
-    if (type === 'mac') return '#f3e5f5'; // Purple-ish
-    return '#f5f5f5'; // Grey
+    if (type === 'boolean') return '#e8f5e9';
+    if (type === 'integer' || type === 'number') return '#e3f2fd';
+    if (type.startsWith('ipv') || type === 'ip' || type === 'prefix') return '#fff3e0';
+    if (type === 'mac') return '#f3e5f5';
+    return '#f5f5f5';
 };
 
 const getBadgeTextColor = (type: string) => {
     if (type === 'boolean') return '#2e7d32';
     if (type === 'integer' || type === 'number') return '#1565c0';
-    if (type.startsWith('ipv')) return '#ef6c00';
+    if (type.startsWith('ipv') || type === 'ip' || type === 'prefix') return '#ef6c00';
     if (type === 'mac') return '#7b1fa2';
     return '#616161';
 };
 
+// Build a smart placeholder from schema metadata
+const buildPlaceholder = (option: ConfigOption): string => {
+    const v = option.validation;
+    const parts: string[] = [];
+
+    // Use examples first if available
+    if (v?.examples?.length) {
+        parts.push(`e.g. ${v.examples.slice(0, 2).join(', ')}`);
+    } else {
+        // Type-based defaults
+        if (option.type === 'mac') parts.push('e.g. 00:11:22:33:44:55');
+        else if (option.type === 'ipv4' || option.type === 'ip') parts.push('e.g. 192.168.1.10');
+        else if (option.type === 'ipv6') parts.push('e.g. 2001:db8::1');
+        else if (option.type === 'prefix') parts.push('e.g. 192.168.1.0/24');
+        else if (option.type === 'duration') parts.push('e.g. 5s, 100ms');
+        else if (option.type === 'bytes') parts.push('e.g. 1500, 9000');
+    }
+
+    // Range hint for numbers
+    if (v?.minimum !== undefined && v?.maximum !== undefined) {
+        parts.push(`${v.minimum}–${v.maximum}`);
+    } else if (v?.minimum !== undefined) {
+        parts.push(`min: ${v.minimum}`);
+    } else if (v?.maximum !== undefined) {
+        parts.push(`max: ${v.maximum}`);
+    }
+
+    // Length hint for strings
+    if (v?.maxLength !== undefined) {
+        parts.push(`max ${v.maxLength} chars`);
+    }
+
+    if (option.default !== undefined) {
+        parts.push(`Default: ${option.default}`);
+    }
+
+    return parts.join(' · ');
+};
+
+// Build badge text with range for number types
+const buildBadgeLabel = (option: ConfigOption): string => {
+    const types = (option.types || [option.type]).filter(t => t !== 'list');
+    const v = option.validation;
+
+    const labels = types.map(t => {
+        const base = getTypeLabel(t);
+        if (t === 'number' && v?.minimum !== undefined && v?.maximum !== undefined) {
+            return `${v.minimum}–${v.maximum}`;
+        }
+        return base;
+    });
+
+    return labels.join('/');
+};
 
 interface ConfigFieldProps {
     option: ConfigOption;
@@ -111,34 +174,12 @@ interface ConfigFieldProps {
     interfaceFiles?: { type: string, netdev_kind?: string, netdev_name?: string, filename: string }[];
 }
 
-const COMMON_INPUT_STYLE: React.CSSProperties = {
-    width: '100%',
-    maxWidth: '400px',
-    padding: '0.6rem',
-    borderRadius: '4px',
-    border: '1px solid var(--border-color)',
-    background: 'var(--bg-secondary)',
-    color: 'var(--text-primary)',
-    fontSize: '0.95rem',
-    height: '42px', // Enforce consistent height
-    boxSizing: 'border-box'
-};
-
-const LABEL_STYLE: React.CSSProperties = {
-    display: 'block',
-    marginBottom: '0.4rem',
-    fontWeight: 500,
-    fontSize: '0.9rem',
-    color: 'var(--text-primary)'
-};
-
 export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, value, onChange, interfaceFiles }) => {
 
     const localValue = value === undefined || value === null ? '' : value;
-    const [inputValue, setInputValue] = useState(''); // Local state for list input
+    const [inputValue, setInputValue] = useState('');
     const [listError, setListError] = useState<string | null>(null);
 
-    // Helper to get dynamic options
     const getDynamicOptions = () => {
         if (!option.dynamic_options || !interfaceFiles) return [];
         return interfaceFiles
@@ -148,17 +189,18 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
     };
 
     if (option.type === 'select') {
+        const defLabel = option.default !== undefined ? ` (Default: ${option.default})` : '';
         return (
-            <div key={option.name} style={{ marginBottom: '1.2rem' }}>
-                <label style={LABEL_STYLE} title={option.description}>
+            <div key={option.name} className="form-field">
+                <label className="form-label" title={option.description}>
                     {option.label} {option.required && <span style={{ color: 'var(--error)' }}>*</span>}
                 </label>
                 <select
                     value={localValue}
                     onChange={e => onChange(e.target.value)}
-                    style={COMMON_INPUT_STYLE}
+                    className="form-input"
                 >
-                    <option value="">(Unset)</option>
+                    <option value="">(Unset{defLabel})</option>
                     {option.options?.map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
                     ))}
@@ -170,11 +212,9 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
     if (option.type === 'list') {
         const listVal: string[] = Array.isArray(localValue) ? localValue : [];
         const dynamicOpts = getDynamicOptions();
-        const validTypes = option.types || ['string'];
-        const displayTypes = validTypes.filter(t => t !== 'list');
 
         const handleAdd = (val: string) => {
-            const error = validateInput(val, validTypes);
+            const error = validateInput(val, option);
             if (error) {
                 setListError(error);
                 return;
@@ -186,12 +226,13 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
             }
         };
 
-        const badgeLabel = displayTypes.map(getTypeLabel).join('/');
+        const badgeLabel = buildBadgeLabel(option);
+        const displayTypes = (option.types || []).filter(t => t !== 'list');
 
         return (
-            <div key={option.name} style={{ marginBottom: '1.2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                    <label style={LABEL_STYLE} title={option.description}>{option.label}</label>
+            <div key={option.name} className="form-field">
+                <div className="form-label-row">
+                    <label className="form-label" title={option.description}>{option.label}</label>
                     <span style={{
                         fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600,
                         background: getBadgeColor(displayTypes[0] || 'string'), color: getBadgeTextColor(displayTypes[0] || 'string')
@@ -200,10 +241,11 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
                     </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'flex-start' }}>
+                <div className="flex-row" style={{ marginBottom: '0.5rem', alignItems: 'flex-start' }}>
                     {(option.dynamic_options || option.options) ? (
                         <select
-                            style={{ ...COMMON_INPUT_STYLE, flex: 1 }}
+                            className="form-input"
+                            style={{ flex: 1 }}
                             value=""
                             onChange={(e) => handleAdd(e.target.value)}
                         >
@@ -220,19 +262,16 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
                         <div style={{ flex: 1, maxWidth: '400px' }}>
                             <input
                                 id={`add-${sectionName}-${option.name}`}
-                                placeholder={option.placeholder || 'Add item...'}
+                                placeholder={buildPlaceholder(option) || 'Add item...'}
                                 value={inputValue}
                                 onChange={(e) => {
                                     setInputValue(e.target.value);
                                     if (e.target.value === '') setListError(null);
-                                    else {
-                                        const err = validateInput(e.target.value, validTypes);
-                                        setListError(err);
-                                    }
+                                    else setListError(validateInput(e.target.value, option));
                                 }}
+                                className="form-input"
                                 style={{
-                                    ...COMMON_INPUT_STYLE,
-                                    maxWidth: '100%', // Override max-width for flex item
+                                    maxWidth: '100%',
                                     border: `1px solid ${listError ? 'var(--error)' : 'var(--border-color)'}`,
                                 }}
                                 onKeyDown={e => {
@@ -261,9 +300,9 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
                         <Plus size={20} />
                     </button>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div className="flex-row flex-wrap">
                     {listVal.map((item, idx) => (
-                        <div key={idx} style={{ background: 'var(--bg-tertiary)', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                        <div key={idx} className="form-list-item">
                             {item}
                             <button onClick={() => onChange(listVal.filter((_, i) => i !== idx))} style={{ padding: 0, color: 'var(--error)', background: 'transparent', border: 'none', cursor: 'pointer' }}>×</button>
                         </div>
@@ -275,19 +314,16 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
 
     // Boolean Handling
     if (option.type === 'boolean') {
-        const defLabel = option.default !== undefined ? ` (Default: ${option.default === 'yes' ? 'Yes' : 'No'})` : '';
+        const defLabel = option.default !== undefined ? ` (Default: ${option.default === 'yes' || option.default === true ? 'Yes' : 'No'})` : '';
         return (
-            <div key={option.name} style={{ marginBottom: '1.2rem' }}>
-                <label style={LABEL_STYLE} title={option.description}>
+            <div key={option.name} className="form-field">
+                <label className="form-label" title={option.description}>
                     {option.label}
                 </label>
                 <select
                     value={localValue === true ? 'yes' : localValue === false ? 'no' : (localValue || '')}
-                    onChange={e => {
-                        const val = e.target.value;
-                        onChange(val);
-                    }}
-                    style={COMMON_INPUT_STYLE}
+                    onChange={e => onChange(e.target.value)}
+                    className="form-input"
                 >
                     <option value="">(Unset{defLabel})</option>
                     <option value="yes">Yes</option>
@@ -297,38 +333,16 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
         );
     }
 
-    // Enum / Select Handling (Explicit select type)
-    if ((option.type as string) === 'select' && option.options) {
-        const defLabel = option.default !== undefined ? ` (Default: ${option.default})` : '';
-        return (
-            <div key={option.name} style={{ marginBottom: '1.2rem' }}>
-                <label style={LABEL_STYLE} title={option.description}>
-                    {option.label}
-                </label>
-                <select
-                    value={localValue || ''}
-                    onChange={e => onChange(e.target.value)}
-                    style={COMMON_INPUT_STYLE}
-                >
-                    <option value="">(Unset{defLabel})</option>
-                    {option.options.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
-            </div>
-        );
-    }
-
     // Text with possible Dynamic Options
     if (option.type === 'string' && option.dynamic_options) {
         const dynamicOpts = getDynamicOptions();
         return (
-            <div key={option.name} style={{ marginBottom: '1.2rem' }}>
-                <label style={LABEL_STYLE} title={option.description}>{option.label}</label>
+            <div key={option.name} className="form-field">
+                <label className="form-label" title={option.description}>{option.label}</label>
                 <select
                     value={localValue}
                     onChange={e => onChange(e.target.value)}
-                    style={COMMON_INPUT_STYLE}
+                    className="form-input"
                 >
                     <option value="">(Select or Type custom...)</option>
                     <option value="">(Unset)</option>
@@ -338,65 +352,48 @@ export const ConfigField: React.FC<ConfigFieldProps> = ({ option, sectionName, v
         )
     }
 
-    // Specialized Text Inputs (IP, MAC, Duration, Bytes)
-    let placeholder = option.placeholder;
-    if (!placeholder) {
-        if (option.type === 'mac') placeholder = 'e.g. 00:11:22:33:44:55';
-        if (option.type === 'ipv4') placeholder = 'e.g. 192.168.1.10';
-        if (option.type === 'ipv6') placeholder = 'e.g. 2001:db8::1';
-        if (option.type === 'duration') placeholder = 'e.g. 5s, 100ms';
-        if (option.type === 'bytes') placeholder = 'e.g. 1G, 1024';
-    }
-
-    if (option.default !== undefined) {
-        const defStr = `Default: ${option.default}`;
-        placeholder = placeholder ? `${placeholder} (${defStr})` : defStr;
-    }
-
-    const validTypes = option.types || [option.type as string];
-    const displayTypes = validTypes.filter(t => t !== 'list');
-    const typeLabel = displayTypes.map(t => getTypeLabel(t)).join('/');
-    // For single inputs, we validate strictly
-    const error = validateInput(String(localValue), validTypes);
-    const badgeBg = displayTypes.length > 1 ? '#e0f7fa' : getBadgeColor(displayTypes[0]);
-    const badgeText = displayTypes.length > 1 ? '#006064' : getBadgeTextColor(displayTypes[0]);
+    // Generic input (text, number, ip, mac, duration, bytes, etc.)
+    const v = option.validation;
+    const placeholder = buildPlaceholder(option);
+    const badgeLabel = buildBadgeLabel(option);
+    const displayTypes = (option.types || [option.type]).filter(t => t !== 'list');
+    const isNumber = option.type === 'number';
+    const error = validateInput(String(localValue), option);
+    const badgeBg = displayTypes.length > 1 ? '#e0f7fa' : getBadgeColor(displayTypes[0] || 'string');
+    const badgeText = displayTypes.length > 1 ? '#006064' : getBadgeTextColor(displayTypes[0] || 'string');
 
     return (
-        <div key={option.name} style={{ marginBottom: '1.2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                <label style={LABEL_STYLE} title={option.description}>
+        <div key={option.name} className="form-field">
+            <div className="form-label-row" style={{ marginBottom: '0.3rem' }}>
+                <label className="form-label" title={option.description}>
                     {option.label} {option.required && <span style={{ color: 'var(--error)' }}>*</span>}
                 </label>
             </div>
-            <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
+            <div className="form-input-wrapper">
                 <input
-                    type={option.type === 'number' ? 'number' : 'text'}
+                    type={isNumber ? 'number' : 'text'}
                     value={localValue}
-                    onChange={e => onChange(option.type === 'number' ? Number(e.target.value) : e.target.value)}
+                    onChange={e => {
+                        if (isNumber) {
+                            onChange(e.target.value === '' ? '' : Number(e.target.value));
+                        } else {
+                            onChange(e.target.value);
+                        }
+                    }}
                     placeholder={placeholder}
                     required={option.required}
-                    style={{
-                        ...COMMON_INPUT_STYLE,
-                        paddingRight: '60px' // Make room for the badge
-                    }}
+                    className="form-input"
+                    style={{ paddingRight: '60px' }}
+                    {...(isNumber && v?.minimum !== undefined ? { min: v.minimum } : {})}
+                    {...(isNumber && v?.maximum !== undefined ? { max: v.maximum } : {})}
+                    {...(!isNumber && v?.minLength !== undefined ? { minLength: v.minLength } : {})}
+                    {...(!isNumber && v?.maxLength !== undefined ? { maxLength: v.maxLength } : {})}
                 />
-                {/* Inline Type Badge */}
-                <div style={{
-                    position: 'absolute',
-                    right: '0.6rem', /* Fixed distance from right */
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: badgeBg,
-                    color: badgeText,
-                    padding: '0.2rem 0.5rem',
-                    borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    pointerEvents: 'none',
-                    userSelect: 'none',
-                    whiteSpace: 'nowrap'
-                }}>
-                    {typeLabel}
+                <div
+                    className="form-input-badge"
+                    style={{ background: badgeBg, color: badgeText }}
+                >
+                    {badgeLabel}
                 </div>
             </div>
             {error && localValue && (

@@ -11,6 +11,7 @@
   /* Default Light Mode Variables */
   --bg-primary: #ffffff;
   --bg-secondary: #f3f4f6;
+  --bg-tertiary: #e5e7eb;
   --text-primary: #111827;
   --text-secondary: #4b5563;
   --border-color: #e5e7eb;
@@ -38,6 +39,7 @@
     /* Lighter blue for dark mode */
     --accent-hover: #60a5fa;
     --card-bg: #1f2937;
+    --bg-tertiary: #374151;
   }
 }
 
@@ -76,4 +78,453 @@ textarea {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   border-color: var(--border-color);
+}
+
+/* ===== Layout ===== */
+
+.page-container {
+  padding-bottom: 4rem;
+}
+
+.editor-layout {
+  height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.grid-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.sidebar {
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.two-col-layout {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  min-height: min-content;
+}
+
+/* ===== Flex Utilities ===== */
+
+.flex-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.flex-row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.flex-col-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+/* ===== Cards ===== */
+
+.card {
+  background: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.card-elevated {
+  background: var(--bg-secondary);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.card-dashed {
+  background: var(--bg-secondary);
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  border: 1px dashed var(--border-color);
+}
+
+.form-section {
+  flex: 1;
+  background: var(--bg-secondary);
+  padding: 2rem;
+  border-radius: 8px;
+}
+
+/* ===== Buttons ===== */
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--accent-primary);
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+}
+
+.btn-danger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--error);
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-secondary);
+}
+
+.btn-icon {
+  padding: 0.3rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+}
+
+.btn-icon:hover {
+  color: var(--accent-primary);
+}
+
+.btn-icon-bordered {
+  padding: 0.3rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+}
+
+.btn-icon-bordered:hover {
+  color: var(--accent-primary);
+}
+
+.btn-back {
+  padding: 0.5rem;
+  display: flex;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.btn-back:hover {
+  background: var(--bg-secondary);
+}
+
+.btn-add-dashed {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.btn-add-dashed:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.btn-tab {
+  text-align: left;
+  padding: 0.6rem 1rem;
+  background: transparent;
+  border-left: 3px solid transparent;
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-tab:hover {
+  color: var(--text-primary);
+}
+
+.btn-tab.active {
+  background: var(--bg-secondary);
+  border-left-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.btn-category {
+  width: 100%;
+  margin-top: 0.5rem;
+  margin-bottom: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: 0.5rem 1rem;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.btn-category.active {
+  color: var(--accent-primary);
+  cursor: default;
+}
+
+.btn-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-control:hover {
+  background: var(--bg-secondary);
+}
+
+/* ===== Forms ===== */
+
+.form-field {
+  margin-bottom: 1.2rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.form-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.form-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.6rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  height: 42px;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-input-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+}
+
+.form-input-badge {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.form-list-item {
+  background: var(--bg-tertiary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.form-display-box {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.form-item-container {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  position: relative;
+}
+
+/* ===== Modals ===== */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  width: 100%;
+  max-width: 400px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* ===== Typography ===== */
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-mono {
+  font-family: monospace;
+}
+
+.text-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: bold;
+  opacity: 0.7;
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
 }

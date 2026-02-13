@@ -41,7 +41,7 @@ const WelcomePage: React.FC = () => {
                     <Server size={48} color="var(--accent-primary)" />
                     Networkd Manager
                 </h1>
-                <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)' }}>
+                <p style={{ fontSize: '1.2rem' }} className="text-secondary">
                     Systemd-networkd configuration and management interface.
                 </p>
             </div>
@@ -49,34 +49,34 @@ const WelcomePage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
 
                 {/* System Status Card */}
-                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <div className="card-elevated">
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: 0 }}>
                         <Activity color="var(--success)" />
                         System Status
                     </h2>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Active Interfaces</span>
-                            <span style={{ fontWeight: 'bold' }}>{activeLinks} <span style={{ fontWeight: 'normal', color: 'var(--text-secondary)' }}>/ {totalLinks}</span></span>
+                    <div className="flex-col" style={{ gap: '0.8rem', marginTop: '1rem' }}>
+                        <div className="flex-row-between">
+                            <span className="text-secondary">Active Interfaces</span>
+                            <span style={{ fontWeight: 'bold' }}>{activeLinks} <span className="text-secondary" style={{ fontWeight: 'normal' }}>/ {totalLinks}</span></span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Systemd Version</span>
-                            <span style={{ fontFamily: 'monospace' }}>v{systemInfo.systemdVersion}</span>
+                        <div className="flex-row-between">
+                            <span className="text-secondary">Systemd Version</span>
+                            <span className="text-mono">v{systemInfo.systemdVersion}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Backend API</span>
-                            <span style={{ fontFamily: 'monospace' }}>v{systemInfo.backendVersion}</span>
+                        <div className="flex-row-between">
+                            <span className="text-secondary">Backend API</span>
+                            <span className="text-mono">v{systemInfo.backendVersion}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Routing Summary Card */}
-                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <div className="card-elevated">
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: 0 }}>
                         <Router color="var(--accent-secondary)" />
                         Routing & Addressing
                     </h2>
-                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '1rem', lineHeight: '1.5' }}>
+                    <div style={{ fontSize: '0.9rem', marginTop: '1rem', lineHeight: '1.5' }} className="text-secondary">
                         <p>
                             Managed by <strong>systemd-networkd</strong>.
                         </p>
@@ -90,14 +90,14 @@ const WelcomePage: React.FC = () => {
                 </div>
             </div>
 
-            <div style={{ background: 'var(--bg-secondary)', padding: '2rem', borderRadius: '12px', textAlign: 'center' }}>
+            <div className="card-elevated" style={{ padding: '2rem', textAlign: 'center' }}>
                 <Info size={32} style={{ marginBottom: '1rem', opacity: 0.5 }} />
                 <h3>About This Interface</h3>
-                <p style={{ color: 'var(--text-secondary)', maxWidth: '600px', margin: '0.5rem auto 0', lineHeight: '1.6' }}>
+                <p className="text-secondary" style={{ maxWidth: '600px', margin: '0.5rem auto 0', lineHeight: '1.6' }}>
                     This frontend allows you to manage physical and virtual network interfaces, configure network profiles (`.network`),
                     and define virtual devices (`.netdev`). Changes are applied to `/etc/systemd/network`.
                 </p>
-                <div style={{ marginTop: '2rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <div className="text-secondary" style={{ marginTop: '2rem', fontSize: '0.85rem' }}>
                     Frontend Version: {systemInfo.frontendVersion}
                 </div>
             </div>
